@@ -71,37 +71,91 @@ const (
 type Cib struct {
 	cCib *C.cib_t
 
-	CrmFeatureSet string `xml:"crm_feature_set,attr"`
 	ValidateWith string `xml:"validate-with,attr"`
 	AdminEpoch int `xml:"admin_epoch,attr"`
 	Epoch int `xml:"epoch,attr"`
 	NumUpdates int `xml:"num_updates,attr"`
+	CrmFeatureSet string `xml:"crm_feature_set,attr"`
+	RemoteTlsPort int `xml:"remote-tls-port,attr"`
+	RemoteClearPort int `xml:"remote-clear-port,attr"`
+	HaveQuorum string `xml:"have-quorum,attr"`
+	DcUuid string `xml:"dc-uuid,attr"`
+	CibLastWritten string `xml:"cib-last-written,attr"`
+	NoQuorumPanic string `xml:"no-quorum-panic,attr"`
+	UpdateOrigin string `xml:"update-origin,attr"`
+	UpdateClient string `xml:"update-client,attr"`
+	UpdateUser string `xml:"update-user,attr"`
+	ExecutionDate string `xml:"execution-date,attr"`
 	Configuration Configuration `xml:"configuration"`
 	Status Status `xml:"status"`
 }
 
 // Represents a configuration name-value pair.
 type NVPair struct {
-	Name string `xml:"name,attr"`
-	Value string `xml:"value,attr"`
+	Id *string `xml:"id,attr"`
+	IdRef *string `xml:"id-ref,attr"`
+	Name *string `xml:"name,attr"`
+	Value *string `xml:"value,attr"`
 }
 
-// Named list of name-value pairs.
-type NVPairList struct {
+type DateSpec struct {
 	Id string `xml:"id,attr"`
+	Hours string `xml:"hours,attr"`
+	Monthdays string `xml:"monthdays,attr"`
+	Weekdays string `xml:"weekdays,attr"`
+	Yearsdays string `xml:"yearsdays,attr"`
+	Months string `xml:"months,attr"`
+	Weeks string `xml:"weeks,attr"`
+	Years string `xml:"years,attr"`
+	Weekyears string `xml:"weekyears,attr"`
+	Moon string `xml:"moon,attr"`
+}
+
+type Rule struct {
+	XMLName xml.Name
+	Id *string `xml:"id,attr"`
+	IdRef *string `xml:"id-ref,attr"`
+	ScoreAttribute *string `xml:"score-attribute,attr"`
+	BooleanOp *string `xml:"boolean-op,attr"`
+
+	Attribute string `xml:"attribute,attr"`
+	Operation string `xml:"operation,attr"`
+	Value *string `xml:"value,attr"`
+	Type *string `xml:"type,attr"`
+	Start *string `xml:"start,attr"`
+	End *string `xml:"end,attr"`
+	Duration *DateSpec `xml:"duration"`
+	DateSpec *DateSpec `xml:"date_spec"`
+
+	Rules []Rule `xml:",any"`
+}
+
+
+// Named list of name-value pairs.
+type NVSet struct {
+	IdRef *string `xml:"id-ref,attr"`
+	Id *string `xml:"id,attr"`
+	Score *string `xml:"score,attr"`
+	Rules []Rule `xml:"rule"`
 	NVPairs []NVPair `xml:"nvpair"`
 }
 
-type Configuration struct {
-	Options []NVPair `xml:"crm_config>cluster_property_set>nvpair"`
-	RscDefaults []NVPair `xml:"rsc_defaults>meta_attributes>nvpair"`
-	OpDefaults []NVPair `xml:"op_defaults>meta_attributes>nvpair"`
+type Node struct {
+	Id string `xml:"id,attr"`
+	Uname string `xml:"uname,attr"`
+	Type string `xml:"type,attr"`
+	Description string `xml:"description,attr"`
+	Score string `xml:"score,attr"`
+	Attributes []NVSet `xml:"instance_attributes"`
+	Utilization []NVSet `xml:"utilization"`
+}
 
-	Nodes []struct {
-		Id string `xml:"id,attr"`
-		Uname string `xml:"uname,attr"`
-		Type string `xml:"type,attr"`
-	} `xml:"nodes>node"`
+type Configuration struct {
+	Options []NVSet `xml:"crm_config>cluster_property_set"`
+	RscDefaults []NVSet `xml:"rsc_defaults>meta_attributes"`
+	OpDefaults []NVSet `xml:"op_defaults>meta_attributes"`
+
+	Nodes []Node `xml:"nodes>node"`
 
 	Primitives []struct {
 		Id string `xml:"id,attr"`

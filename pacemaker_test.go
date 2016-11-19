@@ -32,11 +32,11 @@ func TestDecode(t *testing.T) {
 		t.Error(err)
 	}
 
-	options := cib.Configuration.Options
+	options := cib.Configuration.Options[0]
 
-	for _, opt := range options {
-		if opt.Name == "symmetric-cluster" && opt.Value != "true" {
-			t.Error("Expected symmetric-cluster == true, got ", opt.Value)
+	for _, opt := range options.NVPairs {
+		if *opt.Name == "symmetric-cluster" && *opt.Value != "true" {
+			t.Error("Expected symmetric-cluster == true, got ", *opt.Value)
 		}
 	}
 }
@@ -117,9 +117,9 @@ func ExampleDecode() {
 		log.Fatal(err)
 	}
 
-	options := cib.Configuration.Options
+	options := cib.Configuration.Options[0]
 
-	fmt.Printf("%s = %s\n", options[0].Name, options[0].Value)
+	fmt.Printf("%s = %s\n", *options.NVPairs[0].Name, *options.NVPairs[0].Value)
 	// Output: symmetric-cluster = true
 }
 
