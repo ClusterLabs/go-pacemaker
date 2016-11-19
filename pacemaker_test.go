@@ -31,14 +31,6 @@ func TestDecode(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-
-	options := cib.Configuration.Options[0]
-
-	for _, opt := range options.NVPairs {
-		if *opt.Name == "symmetric-cluster" && *opt.Value != "true" {
-			t.Error("Expected symmetric-cluster == true, got ", *opt.Value)
-		}
-	}
 }
 
 
@@ -117,10 +109,8 @@ func ExampleDecode() {
 		log.Fatal(err)
 	}
 
-	options := cib.Configuration.Options[0]
-
-	fmt.Printf("%s = %s\n", *options.NVPairs[0].Name, *options.NVPairs[0].Value)
-	// Output: symmetric-cluster = true
+	fmt.Printf("%v", cib.Attributes["validate-with"])
+	// Output: pacemaker-1.2
 }
 
 func findOps(cib *pacemaker.Cib, nodename string, rscname string) []pacemaker.LrmRscOp {

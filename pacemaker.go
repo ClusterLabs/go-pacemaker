@@ -5,6 +5,7 @@ import (
 	"unsafe"
 	"fmt"
 	"encoding/xml"
+	"bytes"
 )
 
 /*
@@ -71,102 +72,13 @@ const (
 type Cib struct {
 	cCib *C.cib_t
 
-	ValidateWith string `xml:"validate-with,attr"`
-	AdminEpoch int `xml:"admin_epoch,attr"`
-	Epoch int `xml:"epoch,attr"`
-	NumUpdates int `xml:"num_updates,attr"`
-	CrmFeatureSet string `xml:"crm_feature_set,attr"`
-	RemoteTlsPort int `xml:"remote-tls-port,attr"`
-	RemoteClearPort int `xml:"remote-clear-port,attr"`
-	HaveQuorum string `xml:"have-quorum,attr"`
-	DcUuid string `xml:"dc-uuid,attr"`
-	CibLastWritten string `xml:"cib-last-written,attr"`
-	NoQuorumPanic string `xml:"no-quorum-panic,attr"`
-	UpdateOrigin string `xml:"update-origin,attr"`
-	UpdateClient string `xml:"update-client,attr"`
-	UpdateUser string `xml:"update-user,attr"`
-	ExecutionDate string `xml:"execution-date,attr"`
-	Configuration Configuration `xml:"configuration"`
-	Status Status `xml:"status"`
-}
+	Attributes map[string]string
 
-// Represents a configuration name-value pair.
-type NVPair struct {
-	Id *string `xml:"id,attr"`
-	IdRef *string `xml:"id-ref,attr"`
-	Name *string `xml:"name,attr"`
-	Value *string `xml:"value,attr"`
-}
-
-type DateSpec struct {
-	Id string `xml:"id,attr"`
-	Hours string `xml:"hours,attr"`
-	Monthdays string `xml:"monthdays,attr"`
-	Weekdays string `xml:"weekdays,attr"`
-	Yearsdays string `xml:"yearsdays,attr"`
-	Months string `xml:"months,attr"`
-	Weeks string `xml:"weeks,attr"`
-	Years string `xml:"years,attr"`
-	Weekyears string `xml:"weekyears,attr"`
-	Moon string `xml:"moon,attr"`
-}
-
-type Rule struct {
-	XMLName xml.Name
-	Id *string `xml:"id,attr"`
-	IdRef *string `xml:"id-ref,attr"`
-	ScoreAttribute *string `xml:"score-attribute,attr"`
-	BooleanOp *string `xml:"boolean-op,attr"`
-
-	Attribute string `xml:"attribute,attr"`
-	Operation string `xml:"operation,attr"`
-	Value *string `xml:"value,attr"`
-	Type *string `xml:"type,attr"`
-	Start *string `xml:"start,attr"`
-	End *string `xml:"end,attr"`
-	Duration *DateSpec `xml:"duration"`
-	DateSpec *DateSpec `xml:"date_spec"`
-
-	Rules []Rule `xml:",any"`
-}
-
-
-// Named list of name-value pairs.
-type NVSet struct {
-	IdRef *string `xml:"id-ref,attr"`
-	Id *string `xml:"id,attr"`
-	Score *string `xml:"score,attr"`
-	Rules []Rule `xml:"rule"`
-	NVPairs []NVPair `xml:"nvpair"`
-}
-
-type Node struct {
-	Id string `xml:"id,attr"`
-	Uname string `xml:"uname,attr"`
-	Type string `xml:"type,attr"`
-	Description string `xml:"description,attr"`
-	Score string `xml:"score,attr"`
-	Attributes []NVSet `xml:"instance_attributes"`
-	Utilization []NVSet `xml:"utilization"`
+	Configuration Configuration
+	Status Status
 }
 
 type Configuration struct {
-	Options []NVSet `xml:"crm_config>cluster_property_set"`
-	RscDefaults []NVSet `xml:"rsc_defaults>meta_attributes"`
-	OpDefaults []NVSet `xml:"op_defaults>meta_attributes"`
-
-	Nodes []Node `xml:"nodes>node"`
-
-	Primitives []struct {
-		Id string `xml:"id,attr"`
-		Class string `xml:"class,attr"`
-		Provider string `xml:"provider,attr"`
-		Type string `xml:"type,attr"`
-	} `xml:"resources>primitive"`
-
-	Locations []struct {
-		Id string `xml:"id,attr"`
-	} `xml:"constraints>rsc_location"`
 }
 
 type LrmRscOp struct {
@@ -189,6 +101,11 @@ type LrmResource struct {
 	Ops []LrmRscOp `xml:"lrm_rsc_op"`
 }
 
+type SimpleNVPair struct {
+	Name string `xml:"name,attr"`
+	Value string `xml:"value,attr"`
+}
+
 type NodeState struct {
 	Id string `xml:"id,attr"`
 	Uname string `xml:"uname,attr"`
@@ -198,7 +115,7 @@ type NodeState struct {
 	Join string `xml:"join,attr"`
 	Expected string `xml:"expected,attr"`
 	Resources []LrmResource `xml:"lrm>lrm_resources>lrm_resource"`
-	Attributes []NVPair `xml:"transient_attributes>instance_attributes>nvpair"`
+	Attributes []SimpleNVPair `xml:"transient_attributes>instance_attributes>nvpair"`
 }
 
 type Status struct {
@@ -293,12 +210,11 @@ func (cib *Cib) Version() (*CibVersion, error) {
 }
 
 func (cib *Cib) Decode() error {
-	text, err := cib.Query()
+	xmldata, err := cib.Query()
 	if err != nil {
 		return err
 	}
-	err = xml.Unmarshal(text, cib)
-	if err != nil {
+	if err = cib.loadCibObjects(xmldata); err != nil {
 		return err
 	}
 	return nil
@@ -367,3 +283,29 @@ func init() {
 	C.free(unsafe.Pointer(s))
 }
 
+// Read XML configuration into an object tree.
+// To save, we want a series of crmsh commands
+// so no need for objects -> xml serialization
+// at least. Just save a list of operations
+// performed and apply them all on a shadow cib.
+func (cib *Cib) loadCibObjects(xmldata []byte) error {
+	decoder := xml.NewDecoder(bytes.NewReader(xmldata))
+	for {
+		t, _ := decoder.Token()
+		if t == nil {
+			break
+		}
+		switch se := t.(type) {
+		case xml.StartElement:
+			if se.Name.Local == "cib" {
+				cib.Attributes = make(map[string]string)
+				for _, attr := range se.Attr {
+					cib.Attributes[attr.Name.Local] = attr.Value
+				}
+			} else if (se.Name.Local == "status") {
+				decoder.DecodeElement(&cib.Status, &se)
+			}
+		}
+	}
+	return nil
+}
