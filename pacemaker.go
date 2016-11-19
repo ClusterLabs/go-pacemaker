@@ -1,12 +1,14 @@
+// The pacemaker package provides an API for reading the Pacemaker cluster configuration (CIB).
 package pacemaker
 
 import (
 	"unsafe"
 	"fmt"
+	"encoding/xml"
 )
 
 /*
-#cgo pkg-config: pacemaker pacemaker-cib libqb glib-2.0
+#cgo pkg-config: libxml-2.0 glib-2.0 libqb pacemaker pacemaker-cib
 #include <crm/cib.h>
 #include <crm/common/util.h>
 
@@ -25,6 +27,7 @@ int go_cib_query(cib_t * cib, const char *section, xmlNode ** output_data, int c
 */
 import "C"
 
+// Error type returned by the functions in this package.
 type CibError struct {
 	msg string
 }
@@ -33,10 +36,28 @@ func (e *CibError) Error() string {
 	return e.msg
 }
 
+// Internal function used to create a CibError instance
+// from a pacemaker return code.
 func formatErrorRc(rc int) *CibError {
-	return &CibError{fmt.Sprintf("%d: %s %s", rc, C.GoString(C.pcmk_errorname(C.int(rc))), C.GoString(C.pcmk_strerror(C.int(rc))))}
+	errorname := C.pcmk_errorname(C.int(rc))
+	strerror := C.pcmk_strerror(C.int(rc))
+	if errorname == nil {
+		errorname = C.CString("")
+		defer C.free(unsafe.Pointer(errorname))
+	}
+	if strerror == nil {
+		strerror = C.CString("")
+		defer C.free(unsafe.Pointer(strerror))
+	}
+	return &CibError{fmt.Sprintf("%d: %s %s", rc, C.GoString(errorname), C.GoString(strerror))}
 }
 
+// When connecting to Pacemaker, we have
+// to declare which type of connection to
+// use. Since the API is read-only at the
+// moment, it only really makes sense to
+// pass Query to functions that take a
+// CibConnection parameter.
 type CibConnection int
 
 const (
@@ -44,19 +65,100 @@ const (
 	Command CibConnection = C.cib_command
 )
 
-
+// Root entity representing the CIB. Can be
+// populated with CIB data if the Decode
+// method is used.
 type Cib struct {
 	cCib *C.cib_t
+
+	CrmFeatureSet string `xml:"crm_feature_set,attr"`
+	ValidateWith string `xml:"validate-with,attr"`
+	AdminEpoch int `xml:"admin_epoch,attr"`
+	Epoch int `xml:"epoch,attr"`
+	NumUpdates int `xml:"num_updates,attr"`
+	Configuration Configuration `xml:"configuration"`
+	Status Status `xml:"status"`
+}
+
+// Represents a configuration name-value pair.
+type NVPair struct {
+	Name string `xml:"name,attr"`
+	Value string `xml:"value,attr"`
+}
+
+// Named list of name-value pairs.
+type NVPairList struct {
+	Id string `xml:"id,attr"`
+	NVPairs []NVPair `xml:"nvpair"`
+}
+
+type Configuration struct {
+	Options []NVPair `xml:"crm_config>cluster_property_set>nvpair"`
+	RscDefaults []NVPair `xml:"rsc_defaults>meta_attributes>nvpair"`
+	OpDefaults []NVPair `xml:"op_defaults>meta_attributes>nvpair"`
+
+	Nodes []struct {
+		Id string `xml:"id,attr"`
+		Uname string `xml:"uname,attr"`
+		Type string `xml:"type,attr"`
+	} `xml:"nodes>node"`
+
+	Primitives []struct {
+		Id string `xml:"id,attr"`
+		Class string `xml:"class,attr"`
+		Provider string `xml:"provider,attr"`
+		Type string `xml:"type,attr"`
+	} `xml:"resources>primitive"`
+
+	Locations []struct {
+		Id string `xml:"id,attr"`
+	} `xml:"constraints>rsc_location"`
+}
+
+type LrmRscOp struct {
+	Operation string `xml:"operation,attr"`
+	CallId int `xml:"call-id,attr"`
+	Rc int `xml:"rc-code,attr"`
+	LastRun string `xml:"last-run,attr"`
+	LastRcChange string `xml:"last-rc-change,attr"`
+	ExecTime string `xml:"exec-time,attr"`
+	QueueTime string `xml:"queue-time,attr"`
+	OnNode string `xml:"on_node,attr"`
+	ExitReason string `xml:"exit-reason,attr"`
+}
+
+type LrmResource struct {
+	Id string `xml:"id,attr"`
+	Type string `xml:"type,attr"`
+	Class string `xml:"class,attr"`
+	Provider string `xml:"provider,attr"`
+	Ops []LrmRscOp `xml:"lrm_rsc_op"`
+}
+
+type NodeState struct {
+	Id string `xml:"id,attr"`
+	Uname string `xml:"uname,attr"`
+	InCCM bool `xml:"in_ccm,attr"`
+	Crmd string `xml:"crmd,attr"`
+	CrmDebugOrigin string `xml:"crm-debug-origin,attr"`
+	Join string `xml:"join,attr"`
+	Expected string `xml:"expected,attr"`
+	Resources []LrmResource `xml:"lrm>lrm_resources>lrm_resource"`
+	Attributes []NVPair `xml:"transient_attributes>instance_attributes>nvpair"`
+}
+
+type Status struct {
+	NodeState []NodeState `xml:"node_state"`
 }
 
 type CibVersion struct {
-	admin_epoch int32
-	epoch int32
-	num_updates int32
+	AdminEpoch int32
+	Epoch int32
+	NumUpdates int32
 }
 
 func (ver *CibVersion) String() string {
-	return fmt.Sprintf("%d:%d:%d", ver.admin_epoch, ver.epoch, ver.num_updates)
+	return fmt.Sprintf("%d:%d:%d", ver.AdminEpoch, ver.Epoch, ver.NumUpdates)
 }
 
 func NewCib() *Cib {
@@ -65,7 +167,7 @@ func NewCib() *Cib {
 	return &cib
 }
 
-func (cib *Cib) SignOn(connection CibConnection) *CibError {
+func (cib *Cib) SignOn(connection CibConnection) error {
 	if cib.cCib.state == C.cib_connected_query || cib.cCib.state == C.cib_connected_command {
 		return nil
 	}
@@ -77,7 +179,7 @@ func (cib *Cib) SignOn(connection CibConnection) *CibError {
 	return nil
 }
 
-func (cib *Cib) SignOff() *CibError {
+func (cib *Cib) SignOff() error {
 	rc := C.go_cib_signoff(cib.cCib)
 	if rc != C.pcmk_ok {
 		return formatErrorRc((int)(rc))
@@ -89,7 +191,7 @@ func (cib *Cib) Delete() {
 	C.cib_delete(cib.cCib)
 }
 
-func (cib *Cib) queryImpl(xpath string, nochildren bool) (*C.xmlNode, *CibError) {
+func (cib *Cib) queryImpl(xpath string, nochildren bool) (*C.xmlNode, error) {
 	var root *C.xmlNode
 	var rc C.int
 
@@ -106,7 +208,9 @@ func (cib *Cib) queryImpl(xpath string, nochildren bool) (*C.xmlNode, *CibError)
 	}
 
 	if xpath != "" {
-		rc = C.go_cib_query(cib.cCib, C.CString(xpath), (**C.xmlNode)(unsafe.Pointer(&root)), opts)
+		xp := C.CString(xpath)
+		defer C.free(unsafe.Pointer(xp))
+		rc = C.go_cib_query(cib.cCib, xp, (**C.xmlNode)(unsafe.Pointer(&root)), opts)
 	} else {
 		rc = C.go_cib_query(cib.cCib, nil, (**C.xmlNode)(unsafe.Pointer(&root)), opts)
 	}
@@ -117,7 +221,7 @@ func (cib *Cib) queryImpl(xpath string, nochildren bool) (*C.xmlNode, *CibError)
 }
 
 
-func (cib *Cib) Version() (*CibVersion, *CibError) {
+func (cib *Cib) Version() (*CibVersion, error) {
 	var admin_epoch C.int
 	var epoch C.int
 	var num_updates C.int
@@ -134,64 +238,78 @@ func (cib *Cib) Version() (*CibVersion, *CibError) {
 	return nil, &CibError{"Failed to get CIB version details"}
 }
 
+func (cib *Cib) Decode() error {
+	text, err := cib.Query()
+	if err != nil {
+		return err
+	}
+	err = xml.Unmarshal(text, cib)
+	if err != nil {
+		return err
+	}
+	return nil
+}
 
-func (cib *Cib) Query() (string, *CibError) {
+func (cib *Cib) Query() ([]byte, error) {
 	var root *C.xmlNode
 	root, err := cib.queryImpl("", false)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	defer C.free_xml(root)
 
 	buffer := C.dump_xml_unformatted(root)
 	defer C.free(unsafe.Pointer(buffer))
 
-	return C.GoString(buffer), nil
+	return C.GoBytes(unsafe.Pointer(buffer), (C.int)(C.strlen(buffer))), nil
 }
 
-func (cib *Cib) QueryNoChildren() (string, *CibError) {
+func (cib *Cib) QueryNoChildren() ([]byte, error) {
 	var root *C.xmlNode
 	root, err := cib.queryImpl("", true)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	defer C.free_xml(root)
 
 	buffer := C.dump_xml_unformatted(root)
 	defer C.free(unsafe.Pointer(buffer))
 
-	return C.GoString(buffer), nil
+	return C.GoBytes(unsafe.Pointer(buffer), (C.int)(C.strlen(buffer))), nil
 }
 
 
-func (cib *Cib) QueryXPath(xpath string) (string, *CibError) {
+func (cib *Cib) QueryXPath(xpath string) ([]byte, error) {
 	var root *C.xmlNode
 	root, err := cib.queryImpl(xpath, false)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	defer C.free_xml(root)
 
 	buffer := C.dump_xml_unformatted(root)
 	defer C.free(unsafe.Pointer(buffer))
 
-	return C.GoString(buffer), nil
+	return C.GoBytes(unsafe.Pointer(buffer), (C.int)(C.strlen(buffer))), nil
 }
 
-func (cib *Cib) QueryXPathNoChildren(xpath string) (string, *CibError) {
+func (cib *Cib) QueryXPathNoChildren(xpath string) ([]byte, error) {
 	var root *C.xmlNode
 	root, err := cib.queryImpl(xpath, true)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	defer C.free_xml(root)
 
 	buffer := C.dump_xml_unformatted(root)
 	defer C.free(unsafe.Pointer(buffer))
 
-	return C.GoString(buffer), nil
+	return C.GoBytes(unsafe.Pointer(buffer), (C.int)(C.strlen(buffer))), nil
 }
 
 func init() {
-	C.crm_log_init(C.CString("go-pacemaker"), C.LOG_CRIT, 0, 0, 0, nil, 1)
+	s := C.CString("go-pacemaker")
+	C.crm_log_init(s, C.LOG_CRIT, 0, 0, 0, nil, 1)
+	C.free(unsafe.Pointer(s))
 }
+

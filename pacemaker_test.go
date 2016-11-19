@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"flag"
 	"testing"
+	"log"
 	"github.com/krig/go-pacemaker"
 )
 
@@ -15,23 +16,52 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
+func TestDecode(t *testing.T) {
+	var err error
 
-func ExampleVersion() {
+	cib := pacemaker.NewCib()
+	defer cib.Delete()
+	err = cib.SignOn(pacemaker.Query)
+	if err != nil {
+		t.Error(err)
+	}
+	defer cib.SignOff()
+
+	err = cib.Decode()
+	if err != nil {
+		t.Error(err)
+	}
+
+	options := cib.Configuration.Options
+
+	for _, opt := range options {
+		if opt.Name == "symmetric-cluster" && opt.Value != "true" {
+			t.Error("Expected symmetric-cluster == true, got ", opt.Value)
+		}
+	}
+}
+
+
+func TestVersion(t *testing.T) {
 	cib := pacemaker.NewCib()
 	defer cib.Delete()
 	err := cib.SignOn(pacemaker.Query)
 	if err != nil {
-		panic(err.Error())
+		t.Error(err)
 	}
 	defer cib.SignOff()
 
 	ver, err := cib.Version()
 	if err != nil {
-		panic(err.Error())
+		t.Error(err)
 	}
 
-	fmt.Printf("Version = %s\n", ver.String())
-	// Output: Version = 1:0:0
+	if ver.AdminEpoch != 1 {
+		t.Error("Expected admin_epoch == 1, got ", ver.AdminEpoch)
+	}
+	if ver.Epoch != 0 {
+		t.Error("Expected epoch == 0, got ", ver.Epoch)
+	}
 }
 
 
@@ -40,13 +70,13 @@ func ExampleQuery() {
 	defer cib.Delete()
 	err := cib.SignOn(pacemaker.Query)
 	if err != nil {
-		panic(err.Error())
+		log.Fatal(err)
 	}
 	defer cib.SignOff()
 
 	xml, err := cib.Query()
 	if err != nil {
-		panic(err.Error())
+		log.Fatal(err)
 	}
 
 	fmt.Printf("%s\n", xml[0:4])
@@ -58,15 +88,73 @@ func ExampleQueryXPath() {
 	defer cib.Delete()
 	err := cib.SignOn(pacemaker.Query)
 	if err != nil {
-		panic(err.Error())
+		log.Fatal(err)
 	}
 	defer cib.SignOff()
 
 	xml, err := cib.QueryXPath("//nodes/node[@id=\"xxx\"]")
 	if err != nil {
-		panic(err.Error())
+		log.Fatal(err)
 	}
 
 	fmt.Printf("%s\n", xml)
 	// Output: <node id="xxx" uname="c001n01" type="normal"/>
+}
+
+func ExampleDecode() {
+	var err error
+
+	cib := pacemaker.NewCib()
+	defer cib.Delete()
+	err = cib.SignOn(pacemaker.Query)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer cib.SignOff()
+
+	err = cib.Decode()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	options := cib.Configuration.Options
+
+	fmt.Printf("%s = %s\n", options[0].Name, options[0].Value)
+	// Output: symmetric-cluster = true
+}
+
+func findOps(cib *pacemaker.Cib, nodename string, rscname string) []pacemaker.LrmRscOp {
+	for _, node := range cib.Status.NodeState {
+		if node.Uname == nodename {
+			for _, rsc := range node.Resources {
+				if rsc.Id == rscname {
+					return rsc.Ops
+				}
+			}
+		}
+	}
+	return nil
+}
+
+
+func ExampleDecodeStatus() {
+	var err error
+
+	os.Setenv("CIB_file", "testdata/exit-reason.xml")
+	cib := pacemaker.NewCib()
+	defer cib.Delete()
+	err = cib.SignOn(pacemaker.Query)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer cib.SignOff()
+
+	err = cib.Decode()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	ops := findOps(cib, "node1", "gctvanas-lvm")
+	fmt.Printf(ops[0].ExitReason)
+	// Output: LVM: targetfs did not activate correctly
 }
