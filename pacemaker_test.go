@@ -113,7 +113,7 @@ func ExampleDecode() {
 	// Output: pacemaker-1.2
 }
 
-func findOps(cib *pacemaker.Cib, nodename string, rscname string) []pacemaker.LrmRscOp {
+func findOps(cib *pacemaker.Cib, nodename string, rscname string) []pacemaker.ResourceStateOp {
 	for _, node := range cib.Status.NodeState {
 		if node.Uname == nodename {
 			for _, rsc := range node.Resources {

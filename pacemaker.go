@@ -81,7 +81,7 @@ type Cib struct {
 type Configuration struct {
 }
 
-type LrmRscOp struct {
+type ResourceStateOp struct {
 	Operation string `xml:"operation,attr"`
 	CallId int `xml:"call-id,attr"`
 	Rc int `xml:"rc-code,attr"`
@@ -93,12 +93,12 @@ type LrmRscOp struct {
 	ExitReason string `xml:"exit-reason,attr"`
 }
 
-type LrmResource struct {
+type ResourceState struct {
 	Id string `xml:"id,attr"`
 	Type string `xml:"type,attr"`
 	Class string `xml:"class,attr"`
 	Provider string `xml:"provider,attr"`
-	Ops []LrmRscOp `xml:"lrm_rsc_op"`
+	Ops []ResourceStateOp `xml:"lrm_rsc_op"`
 }
 
 type SimpleNVPair struct {
@@ -114,7 +114,7 @@ type NodeState struct {
 	CrmDebugOrigin string `xml:"crm-debug-origin,attr"`
 	Join string `xml:"join,attr"`
 	Expected string `xml:"expected,attr"`
-	Resources []LrmResource `xml:"lrm>lrm_resources>lrm_resource"`
+	Resources []ResourceState `xml:"lrm>lrm_resources>lrm_resource"`
 	Attributes []SimpleNVPair `xml:"transient_attributes>instance_attributes>nvpair"`
 }
 
