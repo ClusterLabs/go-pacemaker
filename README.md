@@ -6,6 +6,17 @@ Pacemaker cluster manager, specifically with the cluster configuration
 
 **Note:** This API is under heavy development.
 
+Current features:
+
+* Connect and get CIB as an XML `[]byte` block
+* Decode CIB attributes and status section into a Go object structure
+* Encode status section as JSON
+
+Major missing features:
+
+* Decoding / encoding configuration section
+* Writing changes back to the CIB
+
 ## Compatibility
 
 Right now, I'm mainly focused on coming up with a good mapping between
