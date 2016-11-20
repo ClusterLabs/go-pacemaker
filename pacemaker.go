@@ -8,6 +8,8 @@ import (
 	"encoding/json"
 	"bytes"
 	"log"
+	"reflect"
+	"strings"
 )
 
 /*
@@ -83,23 +85,40 @@ type CibSerialize interface {
 // method is used.
 type Cib struct {
 	cCib *C.cib_t
+	Attributes map[string]string `pcmk:"cib-attrs" json:"attributes,omitempty"`
+	Configuration Configuration `xml:"configuration" json:"configuration"`
+	Status Status `xml:"status" json:"status"`
+}
 
-	Attributes map[string]string `json:"attributes,omitempty"`
+type idMixin struct {
+	Id string `xml:"id,attr" json:"id"`
+}
 
-	Configuration Configuration `json:"configuration"`
-	Status Status `json:"status"`
+type idRefMixin struct {
+	IdRef *string `xml:"id-ref,attr,omitempty" json:"id-ref,omitempty"`
+	Id *string `xml:"id,attr,omitempty" json:"id,omitempty"`
+}
+
+type scoreMixin struct {
+	Score *string `xml:"score,attr,omitempty" json:"score,omitempty"`
+}
+
+type descMixin struct {
+	Description *string `xml:"description,attr,omitempty" json:"description,omitempty"`
 }
 
 type RuleExpression struct {
-	Id string `xml:"id,attr" json:"id"`
+	idMixin
 	Attribute string `xml:"attribute,attr" json:"attribute"`
 	Operation string `xml:"operation,attr" json:"operation"`
 	Value *string `xml:"value,attr,omitempty" json:"value,omitempty"`
 	Type *string `xml:"type,attr,omitempty" json:"type,omitempty"`
 }
 
+// date_spec and duration are both backed by this type
+// can be marshalled
 type DateDuration struct {
-	Id string `xml:"id,attr" json:"id"`
+	idMixin
 	Hours *string `xml:"hours,attr,omitempty" json:"hours,omitempty"`
 	Monthdays *string `xml:"monthdays,attr,omitempty" json:"monthdays,omitempty"`
 	Weekdays *string `xml:"weekdays,attr,omitempty" json:"weekdays,omitempty"`
@@ -111,8 +130,9 @@ type DateDuration struct {
 	Moon *string `xml:"moon,attr,omitempty" json:"moon,omitempty"`
 }
 
+// can be marshalled
 type DateExpression struct {
-	Id string `xml:"id,attr" json:"id"`
+	idMixin
 	Operation *string `xml:"operation,attr,omitempty" json:"operation,omitempty"`
 	Start *string `xml:"start,attr,omitempty" json:"start,omitempty"`
 	End *string `xml:"end,attr,omitempty" json:"end,omitempty"`
@@ -120,76 +140,80 @@ type DateExpression struct {
 	DateSpec *DateDuration `xml:"date_spec,omitempty" json:"date_spec,omitempty"`
 }
 
+// can NOT be marshalled
 type Rule struct {
-	IdRef *string `json:"id-ref,omitempty"`
-	Id *string `json:"id,omitempty"`
-	Score *string `json:"score,omitempty"`
-	ScoreAttribute *string `json:"score-attribute,omitempty"`
-	BooleanOp *string `json:"boolean-op,omitempty"`
-	Role *string `json:"role,omitempty"`
-	Expressions []interface{} `json:"expressions,omitempty"`
+	idRefMixin
+	scoreMixin
+	ScoreAttribute *string `xml:"score-attribute,attr,omitempty" json:"score-attribute,omitempty"`
+	BooleanOp *string `xml:"boolean-op,attr,omitempty" json:"boolean-op,omitempty"`
+	Role *string `xml:"role,attr,omitempty" json:"role,omitempty" validate:"ValidAttributeRole"`
+	Expressions []interface{} `pcmk:"rule-expression" xml:"expression,omitempty" json:"expressions,omitempty"`
 }
 
+// can be marshalled
 type NVPair struct {
-	Id *string `xml:"id,attr,omitempty" json:"id,omitempty"`
-	IdRef *string `xml:"id-ref,attr,omitempty" json:"id-ref,omitempty"`
+	idRefMixin
 	Name *string `xml:"name,attr,omitempty" json:"name,omitempty"`
 	Value *string `xml:"value,attr,omitempty" json:"value,omitempty"`
 }
 
+// can NOT be marshalled (due to rules)
 type AttributeSet struct {
-	Id *string `json:"id,omitempty"`
-	IdRef *string `json:"id-ref,omitempty"`
-	Score *string `json:"score,omitempty"`
-	Rules []Rule `json:"rules,omitempty"`
-	Values []NVPair `json:"values,omitempty"`
+	idRefMixin
+	scoreMixin
+	Rules []Rule `xml:"rule,omitempty" json:"rules,omitempty"`
+	Values []NVPair `xml:"nvpair,omitempty" json:"values,omitempty"`
 }
 
+// can NOT be marshalled (due to attributesets)
 type Op struct {
-	Id string `xml:"id,attr" json:"id"`
+	idMixin
+	descMixin
 	Name string `xml:"name,attr" json:"name"`
 	Interval string `xml:"interval,attr" json:"interval"`
-	Description *string `xml:"description,attr,omitempty" json:"description,omitempty"`
 	StartDelay *string `xml:"start-delay,attr,omitempty" json:"start-delay,omitempty"`
 	IntervalOrigin *string `xml:"interval-origin,attr,omitempty" json:"interval-origin,omitempty"`
 	Timeout *string `xml:"timeout,attr,omitempty" json:"timeout,omitempty"`
 	Enabled *bool `xml:"enabled,attr,omitempty" json:"enabled,omitempty"`
 	RecordPending *bool `xml:"record-pending,attr,omitempty" json:"record-pending,omitempty"`
-	Role *string `xml:"role,attr,omitempty" json:"role,omitempty"`
-	Requires *string `xml:"requires,attr,omitempty" json:"requires,omitempty"`
-	OnFail *string `xml:"on-fail,attr,omitempty" json:"on-fail,omitempty"`
+	Role *string `xml:"role,attr,omitempty" json:"role,omitempty" validate:"ValidAttributeRole"`
+	Requires *string `xml:"requires,attr,omitempty" json:"requires,omitempty" validate:"ValidOperationRequires"`
+	OnFail *string `xml:"on-fail,attr,omitempty" json:"on-fail,omitempty" validate:"ValidOperationFail"`
 	Attributes []AttributeSet `xml:"instance_attributes,omitempty" json:"attributes,omitempty"`
 	Meta []AttributeSet `xml:"meta_attributes,omitempty" json:"meta,omitempty"`
 }
 
+// can NOT be marshalled (due to op/attributesets)
 type OpSet struct {
-	Id *string `xml:"id,attr,omitempty" json:"id,omitempty"`
-	IdRef *string `xml:"id-ref,attr,omitempty" json:"id-ref,omitempty"`
+	idRefMixin
 	Ops []Op `xml:"operation,omitempty" json:"ops,omitempty"`
 }
 
+// can NOT be marshalled
 type Resource struct {
-	Id string `xml:"id,attr" json:"id"`
-	Description *string `xml:"description,attr,omitempty" json:"description,omitempty"`
+	idMixin
+	descMixin
 	Attributes []AttributeSet `xml:"instance_attributes,omitempty" json:"attributes,omitempty"`
 	Meta []AttributeSet `xml:"meta_attributes,omitempty" json:"meta,omitempty"`
 }
 
 
+// can NOT be marshalled
 type Template struct {
 	Resource
 	Type string `xml:"type,attr" json:"type"`
-	Class string `xml:"class,attr" json:"class"`
+	Class string `xml:"class,attr" json:"class" validate:"ValidResourceClass"`
 	Provider *string `xml:"provider,attr,omitempty" json:"provider,omitempty"`
 	Utilization []AttributeSet `xml:"utilization,omitempty" json:"utilization,omitempty"`
 	Ops []OpSet `xml:"operations,omitempty" json:"ops,omitempty"`
 }
 
 
+// can NOT be marshalled
 type Primitive struct {
 	Resource
 	Type *string `xml:"type,attr,omitempty" json:"type,omitempty"`
-	Class *string `xml:"class,attr,omitempty" json:"class,omitemty"`
+	Class *string `xml:"class,attr,omitempty" json:"class,omitemty" validate:"ValidResourceClass"`
 	Provider *string `xml:"provider,attr,omitempty" json:"provider,omitempty"`
 	Template *string `xml:"template,attr,omitempty" json:"template,omitempty"`
 	Utilization []AttributeSet `xml:"utilization,omitempty" json:"utilization,omitempty"`
@@ -197,141 +221,155 @@ type Primitive struct {
 }
 
 
+// can NOT be marshalled
 type Group struct {
 	Resource
 	Children []Primitive `xml:"primitive" json:"children"`
 }
 
+// can NOT be marshalled
 type Clone struct {
 	Resource
-	Child CibObject `json:"child"`
+	Child CibObject `xml:"child" json:"child"`
 }
 
+// can NOT be marshalled
 type Master struct {
 	Resource
-	Child CibObject `json:"child"`
+	Child CibObject `xml:"child" json:"child"`
 }
 
+// can NOT be marshalled
 type Constraint struct {
-	Id string `xml:"id,attr" json:"id"`
+	idMixin
 }
 
+// can NOT be marshalled
 type ResourceSet struct {
-	Id *string `xml:"id,attr,omitempty" json:"id,omitempty"`
-	IdRef *string `xml:"id-ref,attr,omitempty" json:"id-ref,omitempty"`
-	Sequential *bool `json:"sequential,omitempty"`
-	RequireAll *bool `json:"require-all,omitempty"`
-	Ordering *string `json:"ordering,omitempty"`
-	Action *string `json:"action,omitempty"`
-	Role *string `json:"role,omitempty"`
-	Score *string `json:"score,omitempty"`
-	Resources []string `json:"resources,omitempty"`
+	idRefMixin
+	Sequential *bool `xml:"sequential,attr,omitempty" json:"sequential,omitempty"`
+	RequireAll *bool `xml:"require-all,attr,omitempty" json:"require-all,omitempty"`
+	Ordering *string `xml:"ordering,attr,omitempty" json:"ordering,omitempty" validate:"ValidConstraintOrdering"`
+	Action *string `xml:"action,attr,omitempty" json:"action,omitempty" validate:"ValidAttributeAction"`
+	Role *string `xml:"role,attr,omitempty" json:"role,omitempty" validate:"ValidAttributeRole"`
+	scoreMixin
+	Resources []string `xml:"resource_ref,omitempty" json:"resources,omitempty"`
 }
 
+// can NOT be marshalled
 type Location struct {
 	Constraint
-	Rsc *string `json:"rsc,omitempty"`
-	RscPattern *string `json:"rsc-pattern,omitempty"`
-	Role *string `json:"role,omitempty"`
-	Score *string `json:"score,omitempty"`
-	Node *string `json:"node,omitempty"`
-	ResourceSets []ResourceSet `json:"resource-sets,omitempty"`
-	ResourceDiscovery *string `json:"resource-discovery,omitempty"`
-	Rules []Rule `json:"rules,omitempty"`
+	Rsc *string `xml:"rsc,attr,omitempty" json:"rsc,omitempty"`
+	RscPattern *string `xml:"rsc-pattern,attr,omitempty" json:"rsc-pattern,omitempty"`
+	Role *string `xml:"role,attr,omitempty" json:"role,omitempty"`
+	scoreMixin
+	Node *string `xml:"node,attr,omitempty" json:"node,omitempty"`
+	ResourceSets []ResourceSet `xml:"resource-set,omitempty" json:"resource-sets,omitempty"`
+	ResourceDiscovery *string `xml:"resource-discovery,attr,omitempty" json:"resource-discovery,omitempty" validate:"ValidAttributeDiscovery"`
+	Rules []Rule `xml:"rule,omitempty" json:"rules,omitempty"`
 }
 
+// can NOT be marshalled
 type Colocation struct {
 	Constraint
-	Score *string `json:"score,omitempty"`
-	ScoreAttribute *string `json:"score-attribute,omitempty"`
-	ScoreAttributeMangle *string `json:"score-attribute-mangle,omitempty"`
-	ResourceSets []ResourceSet `json:"resource-sets,omitempty"`
-	Rsc *string `json:"rsc,omitempty"`
-	WithRsc *string `json:"with-rsc,omitempty"`
-	NodeAttribute *string `json:"node-attribute,omitempty"`
-	RscRole *string `json:"rsc-role,omitempty"`
-	WithRscRole *string `json:"with-rsc-role,omitempty"`
+	scoreMixin
+	ResourceSets []ResourceSet `xml:"resource-set" json:"resource-sets,omitempty"`
+	Rsc *string `xml:"rsc,attr,omitempty" json:"rsc,omitempty"`
+	WithRsc *string `xml:"with-rsc,attr,omitempty" json:"with-rsc,omitempty"`
+	NodeAttribute *string `xml:"node-attribute,attr,omitempty" json:"node-attribute,omitempty"`
+	RscRole *string `xml:"rsc-role,attr,omitempty" json:"rsc-role,omitempty"`
+	WithRscRole *string `xml:"with-rsc-role,attr,omitempty" json:"with-rsc-role,omitempty"`
 }
 
+// can NOT be marshalled
 type Order struct {
 	Constraint
-	Symmetrical *bool `json:"symmetrical,omitempty"`
-	RequireAll *bool `json:"require-all,omitempty"`
-	Score *string `json:"score,omitempty"`
-	Kind *string `json:"kind,omitempty"`
-	ResourceSets []ResourceSet `json:"resource-sets,omitempty"`
-	First *string `json:"first,omitempty"`
-	Then *string `json:"then,omitempty"`
-	FirstAction *string `json:"first-action,omitempty"`
-	ThenAction *string `json:"then-action,omitempty"`
+	Symmetrical *bool `xml:"symmetrical,attr,omitempty" json:"symmetrical,omitempty"`
+	RequireAll *bool `xml:"require-all,attr,omitempty" json:"require-all,omitempty"`
+	scoreMixin
+	Kind *string `xml:"kind,attr,omitempty" json:"kind,omitempty"`
+	ResourceSets []ResourceSet `xml:"resource-set" json:"resource-sets,omitempty"`
+	First *string `xml:"first,attr,omitempty" json:"first,omitempty"`
+	Then *string `xml:"then,attr,omitempty" json:"then,omitempty"`
+	FirstAction *string `xml:"first-action,attr,omitempty" json:"first-action,omitempty" validate:"ValidAttributeAction"`
+	ThenAction *string `xml:"then-action,attr,omitempty" json:"then-action,omitempty" validate:"ValidAttributeAction"`
 }
 
+// can NOT be marshalled
 type Ticket struct {
 	Constraint
-	ResourceSets []ResourceSet `json:"resource-sets,omitempty"`
-	Rsc *string `json:"rsc,omitempty"`
-	RscRole *string `json:"rsc-role,omitempty"`
-	Ticket string `json:"ticket"`
-	LossPolicy *string `json:"loss-policy,omitempty"`
+	ResourceSets []ResourceSet `xml:"resource-set" json:"resource-sets,omitempty"`
+	Rsc *string `xml:"rsc,attr,omitempty" json:"rsc,omitempty"`
+	RscRole *string `xml:"rsc-role,attr,omitempty" json:"rsc-role,omitempty" validate:"ValidAttributeRole"`
+	Ticket string `xml:"ticket,attr" json:"ticket"`
+	LossPolicy *string `xml:"loss-policy,attr,omitempty" json:"loss-policy,omitempty" validate:"ValidTicketLossPolicy"`
 }
 
+// can NOT be marshalled
 type Node struct {
-	Id string `json:"id"`
-	Uname string `json:"uname"`
-	Type *string `json:"type,omitempty"`
-	Description *string `json:"description,omitempty"`
-	Score *string `json:"score,omitempty"`
-	Attributes []AttributeSet `json:"attributes,omitempty"`
-	Utilization []AttributeSet `json:"utilization,omitempty"`
+	idMixin
+	descMixin
+	scoreMixin
+	Uname string `xml:"uname,attr" json:"uname"`
+	Type *string `xml:"type,attr,omitempty" json:"type,omitempty" validate:"ValidNodeType"`
+	Attributes []AttributeSet `xml:"instance_attributes" json:"attributes,omitempty"`
+	Utilization []AttributeSet `xml:"utilization" json:"utilization,omitempty"`
 }
 
+// can be marshalled
 type FencingLevel struct {
-	Id string `json:"id"`
-	Target *string `json:"target,omitempty"`
-	TargetPattern *string `json:"target-pattern,omitempty"`
-	TargetAttribute *string `json:"target-attribute,omitempty"`
-	TargetValue *string `json:"target-value,omitempty"`
-	Index int `json:"index"`
-	Devices string `json:"devices"`
+	idMixin
+	Target *string `xml:"target,attr,omitempty" json:"target,omitempty"`
+	TargetPattern *string `xml:"target-pattern,attr,omitempty" json:"target-pattern,omitempty"`
+	TargetAttribute *string `xml:"target-attribute,attr,omitempty" json:"target-attribute,omitempty"`
+	TargetValue *string `xml:"target-value,attr,omitempty" json:"target-value,omitempty"`
+	Index int `xml:"index,attr" json:"index"`
+	Devices string `xml:"devices,attr" json:"devices"`
 }
 
+// can be marshalled
 type AclTarget struct {
-	Id string `json:"id"`
-	Roles []string `json:"roles,omitempty"`
+	idMixin
+	Roles []string `xml:"role" json:"roles,omitempty"`
 }
 
+// can be marshalled
 type AclPermission struct {
-	Id string `json:"id"`
-	Kind string `json:"kind"`
-	Xpath *string `json:"xpath,omitempty"`
-	Reference *string `json:"reference,omitempty"`
-	ObjectType *string `json:"object-type,omitempty"`
-	Attribute *string `json:"attribute,omitempty"`
-	Description *string `json:"description,omitempty"`
+	idMixin
+	descMixin
+	Kind string `xml:"kind,attr" json:"kind" validate:"ValidPermissionKind"`
+	Xpath *string `xml:"xpath,attr,omitempty" json:"xpath,omitempty"`
+	Reference *string `xml:"reference,attr,omitempty" json:"reference,omitempty"`
+	ObjectType *string `xml:"object-type,attr,omitempty" json:"object-type,omitempty"`
+	Attribute *string `xml:"attribute,attr,omitempty" json:"attribute,omitempty"`
 }
 
+// can be marshalled
 type AclRole struct {
-	Id string `json:"id"`
-	Description *string `json:"description,omitempty"`
-	Permissions []AclPermission `json:"permissions,omitempty"`
+	idMixin
+	descMixin
+	Permissions []AclPermission `xml:"acl_permission" json:"permissions,omitempty"`
 }
 
+// can NOT be marshalled
 type Tag struct {
-	Id string `json:"id"`
-	References []string `json:"references,omitempty"`
+	idMixin
+	References []string `xml:"obj_ref" json:"references,omitempty"`
 }
 
+// can NOT be marshalled
 type Recipient struct {
-	Id string `json:"id"`
-	Description *string `json:"description,omitempty"`
-	Value string `json:"value"`
-	Meta []AttributeSet `json:"meta,omitempty"`
-	Attributes []AttributeSet `json:"attributes,omitempty"`
+	idMixin
+	descMixin
+	Value string `xml:"value,attr" json:"value"`
+	Meta []AttributeSet `xml:"meta_attributes" json:"meta,omitempty"`
+	Attributes []AttributeSet `xml:"instance_attributes" json:"attributes,omitempty"`
 }
 
+// can NOT be marshalled
 type Alert struct {
-	Id string `xml:"id,attr,omitempty" json:"id"`
-	Description *string `xml:"description,attr,omitempty" json:"description,omitempty"`
+	idMixin
+	descMixin
 	Path string `xml:"path,attr" json:"path"`
 	Meta []AttributeSet `xml:"meta_attributes,omitempty" json:"meta,omitempty"`
 	Attributes []AttributeSet `xml:"instance_attributes,omitempty" json:"attributes,omitempty"`
@@ -345,8 +383,8 @@ type Configuration struct {
 	RscDefaults []AttributeSet `xml:"rsc_defaults>meta_attributes,omitempty" json:"rsc_defaults,omitempty"`
 	OpDefaults []AttributeSet `xml:"op_defaults>meta_attributes,omitempty" json:"op_defaults,omitempty"`
 	Nodes []Node `xml:"nodes>node,omitempty" json:"nodes,omitempty"`
-	Resources []CibObject `json:"resources,omitempty"`
-	Constraints []CibObject `json:"constraints,omitempty"`
+	Resources []CibObject `xml:"resource" json:"resources,omitempty"`
+	Constraints []CibObject `xml:"constraint" json:"constraints,omitempty"`
 	Fencing []FencingLevel `xml:"fencing-topology>fencing-level,omitempty" json:"fencing-topology,omitempty"`
 	AclTargets []AclTarget `xml:"acls>acl_target,omitempty" json:"acl-targets,omitempty"`
 	AclRoles []AclRole `xml:"acls>acl_role,omitempty" json:"acl-roles,omitempty"`
@@ -609,7 +647,6 @@ func init() {
 	C.free(unsafe.Pointer(s))
 }
 
-var ValidOperationRole = []string{"Stopped", "Started", "Slave", "Master"}
 var ValidOperationRequires = []string{"nothing", "quorum", "fencing", "unfencing"}
 var ValidOperationOnFail = []string{"ignore", "block", "stop", "restart", "standby", "fence", "restart-container"}
 var ValidResourceClass = []string{"ocf", "lsb", "heartbeat", "stonith", "upstart", "service", "systemd", "nagios"}
@@ -659,6 +696,12 @@ func decodeTagImpl(decoder *xml.Decoder, se *xml.StartElement,
 }
 
 
+func stringToBool(bstr string) bool {
+	sl := strings.ToLower(bstr)
+	return sl == "true" || sl == "on" || sl == "yes" || sl == "y" || sl == "1"
+}
+
+
 // Read XML configuration into an object tree.
 // To save, we want a series of crmsh commands
 // so no need for objects -> xml serialization
@@ -678,164 +721,10 @@ func (cib *Cib) decodeCibObjects(xmldata []byte) error {
 				for _, attr := range se.Attr {
 					cib.Attributes[attr.Name.Local] = attr.Value
 				}
-			} else if (se.Name.Local == "configuration") {
-				decodeConfiguration(decoder, &cib.Configuration)
 			} else if (se.Name.Local == "status") {
 				decoder.DecodeElement(&cib.Status, &se)
 			}
 		}
 	}
 	return nil
-}
-
-func decodeNVPair(decoder *xml.Decoder, se *xml.StartElement) *NVPair {
-	a := &NVPair{}
-	decodeTagImpl(decoder, se, func(attr xml.Attr) bool {
-		switch attr.Name.Local {
-		case "id":
-			a.Id = &attr.Value
-		case "id-ref":
-			a.IdRef = &attr.Value
-		case "name":
-			a.Name = &attr.Value
-		case "value":
-			a.Value = &attr.Value
-		default:
-			log.Printf("Warning: Unknown nvpair attribute '%s'", attr.Name.Local)
-		}
-		return true
-	}, nil)
-	return a
-}
-
-func decodeRule(decoder *xml.Decoder, se *xml.StartElement) *Rule {
-	a := &Rule{}
-	decodeTagImpl(decoder, se, func(attr xml.Attr) bool {
-		switch attr.Name.Local {
-		case "id":
-			a.Id = &attr.Value
-		case "id-ref":
-			a.IdRef = &attr.Value
-		case "score":
-			a.Score = &attr.Value
-		case "score-attribute":
-			a.ScoreAttribute = &attr.Value
-		case "boolean-op":
-			a.BooleanOp = &attr.Value
-		case "role":
-			a.Role = &attr.Value
-		default:
-			log.Printf("Warning: Unknown nvpair attribute '%s'", attr.Name.Local)
-		}
-		return false
-	}, func(decoder *xml.Decoder, parent *xml.StartElement, current *xml.StartElement, depth int) bool {
-		if current.Name.Local == "expression" {
-			n := decodeRuleExpression(decoder, current)
-			if n != nil {
-				a.Expressions = append(a.Expressions, *n)
-			}
-		} else if current.Name.Local == "date_expression" {
-			n := decodeDateExpression(decoder, current)
-			if n != nil {
-				a.Expressions = append(a.Expressions, *n)
-			}
-		} else if current.Name.Local == "rule" {
-			r := decodeRule(decoder, current)
-			if r != nil {
-				a.Expressions = append(a.Expressions, *r)
-			}
-		}
-		return false
-	})
-	return a
-}
-
-func decodeAttributeSet(decoder *xml.Decoder, se *xml.StartElement) *AttributeSet {
-	a := &AttributeSet{}
-	depth := 1
-	for _, attr := range se.Attr {
-		switch attr.Name.Local {
-		case "id":
-			a.Id = &attr.Value
-		case "id-ref":
-			a.IdRef = &attr.Value
-		case "score":
-			a.Score = &attr.Value
-		default:
-			log.Printf("Warning: Unknown nvset attribute '%s'", attr.Name.Local)
-		}
-	}
-	for {
-		t, _ := decoder.Token()
-		if t == nil {
-			break
-		}
-		switch ce := t.(type) {
-		case xml.StartElement:
-			if ce.Name.Local == se.Name.Local {
-				depth++
-			} else if depth == 1 {
-				if ce.Name.Local == "nvpair" {
-					n := decodeNVPair(decoder, &ce)
-					if n != nil {
-						a.Values = append(a.Values, *n)
-					}
-				} else if ce.Name.Local == "rule" {
-					r := decodeRule(decoder, &ce)
-					if r != nil {
-						a.Rules = append(a.Rules, *r)
-					}
-				}
-			}
-		case xml.EndElement:
-			if ce.Name.Local == se.Name.Local {
-				depth--
-				if depth == 0 {
-					return a
-				}
-			}
-		}
-	}
-	return a
-}
-
-
-func decodeConfiguration(decoder *xml.Decoder, configuration *Configuration) {
-	for {
-		t, _ := decoder.Token()
-		if t == nil {
-			break
-		}
-		switch se := t.(type) {
-		case xml.StartElement:
-			switch se.Name.Local {
-			case "cluster_property_set":
-				a := decodeAttributeSet(decoder, &se)
-				if a != nil {
-					configuration.CrmConfig = append(configuration.CrmConfig, *a)
-				}
-			case "rsc_defaults":
-				a := decodeAttributeSet(decoder, &se)
-				if a != nil {
-					configuration.RscDefaults = append(configuration.RscDefaults, *a)
-				}
-			case "op_defaults":
-				a := decodeAttributeSet(decoder, &se)
-				if a != nil {
-					configuration.OpDefaults = append(configuration.OpDefaults, *a)
-				}
-			case "nodes":
-			case "resources":
-			case "constraints":
-			case "acls":
-			case "tags":
-			case "alerts":
-			case "fencing-topology":
-			}
-		case xml.EndElement:
-			if se.Name.Local == "configuration" {
-				return
-			}
-		}
-	}
 }
