@@ -83,269 +83,271 @@ type CibSerialize interface {
 type Cib struct {
 	cCib *C.cib_t
 
-	Attributes map[string]string
+	Attributes map[string]string `json:"attributes,omitempty"`
 
-	Configuration Configuration
-	Status Status
+	Configuration Configuration `json:"configuration"`
+	Status Status `json:"status"`
 }
 
 type RuleExpression struct {
-	Id string
-	Attribute string
-	Operation string
-	Value *string
-	Type *string
+	Id string `json:"id"`
+	Attribute string `json:"attribute"`
+	Operation string `json:"operation"`
+	Value *string `json:"value,omitempty"`
+	Type *string `json:"type,omitempty"`
 }
 
 type DateDuration struct {
-	Id string
-	Hours *string
-	Monthdays *string
-	Weekdays *string
-	Yearsdays *string
-	Months *string
-	Weeks *string
-	Years *string
-	Weekyears *string
-	Moon *string
+	Id string `json:"id"`
+	Hours *string `json:"hours,omitempty"`
+	Monthdays *string `json:"monthdays,omitempty"`
+	Weekdays *string `json:"weekdays,omitempty"`
+	Yearsdays *string `json:"yearsdays,omitempty"`
+	Months *string `json:"months,omitempty"`
+	Weeks *string `json:"weeks,omitempty"`
+	Years *string `json:"years,omitempty"`
+	Weekyears *string `json:"weekyears,omitempty"`
+	Moon *string `json:"moon,omitempty"`
 }
 
 type DateExpression struct {
-	Id string
-	Operation *string
-	Start *string
-	End *string
-	Duration *DateDuration
+	Id string `json:"id"`
+	Operation *string `json:"operation,omitempty"`
+	Start *string `json:"start,omitempty"`
+	End *string `json:"end,omitempty"`
+	Duration *DateDuration `json:"duration,omitempty"`
 }
 
 type Rule struct {
-	IdRef *string
-	Id *string
-	Score *string
-	ScoreAttribute *string
-	BooleanOp *string
-	Role *string
-	Expressions []interface{}
+	IdRef *string `json:"id-ref,omitempty"`
+	Id *string `json:"id,omitempty"`
+	Score *string `json:"score,omitempty"`
+	ScoreAttribute *string `json:"score-attribute,omitempty"`
+	BooleanOp *string `json:"boolean-op,omitempty"`
+	Role *string `json:"role,omitempty"`
+	Expressions []interface{} `json:"expressions,omitempty"`
 }
 
 type NVPair struct {
-	Id *string
-	IdRef *string
-	Name *string
-	Value *string
+	Id *string `json:"id,omitempty"`
+	IdRef *string `json:"id-ref,omitempty"`
+	Name *string `json:"name,omitempty"`
+	Value *string `json:"value,omitempty"`
 }
 
 type AttributeSet struct {
-	Id *string
-	IdRef *string
-	Score *string
-	Rules []Rule
-	Values []NVPair
+	Id *string `json:"id,omitempty"`
+	IdRef *string `json:"id-ref,omitempty"`
+	Score *string `json:"score,omitempty"`
+	Rules []Rule `json:"rules,omitempty"`
+	Values []NVPair `json:"values,omitempty"`
 }
 
-type Operation struct {
-	Id string
-	Name string
-	Interval string
-	Description *string
-	StartDelay *string
-	IntervalOrigin *string
-	Timeout *string
-	Enabled *bool
-	RecordPending *bool
-	Role *string
-	Requires *string
-	OnFail *string
-	Meta []AttributeSet
-	Attributes []AttributeSet
+type Op struct {
+	Id string `json:"id"`
+	Name string `json:"name"`
+	Interval string `json:"interval"`
+	Description *string `json:"description,omitempty"`
+	StartDelay *string `json:"start-delay,omitempty"`
+	IntervalOrigin *string `json:"interval-origin,omitempty"`
+	Timeout *string `json:"timeout,omitempty"`
+	Enabled *bool `json:"enabled,omitempty"`
+	RecordPending *bool `json:"record-pending,omitempty"`
+	Role *string `json:"role,omitempty"`
+	Requires *string `json:"requires,omitempty"`
+	OnFail *string `json:"on-fail,omitempty"`
+	Attributes []AttributeSet `json:"attributes,omitempty"`
+	Meta []AttributeSet `json:"meta,omitempty"`
 }
 
-type OperationSet struct {
-	Id *string
-	IdRef *string
-	Operations []Operation
+type OpSet struct {
+	Id *string `json:"id,omitempty"`
+	IdRef *string `json:"id-ref,omitempty"`
+	Ops []Op `json:"ops,omitempty"`
 }
 
 type Resource struct {
-	Id string
-	Description *string
-	Attributes []AttributeSet
-	Meta []AttributeSet
+	Id string `json:"id"`
+	Description *string `json:"description,omitempty"`
+	Attributes []AttributeSet `json:"attributes,omitempty"`
+	Meta []AttributeSet `json:"meta,omitempty"`
 }
 
-type Primitive struct {
-	Resource
-	Type *string
-	Class *string
-	Provider *string
-	Template *string
-	Utilization []AttributeSet
-	Operations []OperationSet
-}
 
 type Template struct {
 	Resource
-	Type string
-	Class string
-	Provider *string
-	Utilization []AttributeSet
-	Operations []OperationSet
+	Type string `json:"type"`
+	Class string `json:"class"`
+	Provider *string `json:"provider,omitempty"`
+	Utilization []AttributeSet `json:"utilization,omitempty"`
+	Ops []OpSet `json:"ops,omitempty"`
+}
+
+
+type Primitive struct {
+	Resource
+	Type *string `json:"type,omitempty"`
+	Class *string `json:"class,omitemty"`
+	Provider *string `json:"provider,omitempty"`
+	Template *string `json:"template,omitempty"`
+	Utilization []AttributeSet `json:"utilization,omitempty"`
+	Ops []OpSet `json:"ops,omitempty"`
 }
 
 
 type Group struct {
 	Resource
-	Children []Primitive
+	Children []Primitive `json:"children"`
 }
 
 type Clone struct {
 	Resource
-	Child CibObject
+	Child CibObject `json:"child"`
 }
 
 type Master struct {
 	Resource
-	Child CibObject
+	Child CibObject `json:"child"`
 }
 
 type Constraint struct {
-	Id string
+	Id string `json:"id"`
 }
 
 type ResourceSet struct {
-	Id *string
-	IdRef *string
-	Sequential *bool
-	RequireAll *bool
-	Ordering *string
-	Action *string
-	Role *string
-	Score *string
-	Resources []string
+	Id *string `json:"id,omitempty"`
+	IdRef *string `json:"id-ref,omitempty"`
+	Sequential *bool `json:"sequential,omitempty"`
+	RequireAll *bool `json:"require-all,omitempty"`
+	Ordering *string `json:"ordering,omitempty"`
+	Action *string `json:"action,omitempty"`
+	Role *string `json:"role,omitempty"`
+	Score *string `json:"score,omitempty"`
+	Resources []string `json:"resources,omitempty"`
 }
 
 type Location struct {
 	Constraint
-	Rsc *string
-	RscPattern *string
-	Role *string
-	Score *string
-	Node *string
-	ResourceSets []ResourceSet
-	ResourceDiscovery *string
-	Rules []Rule
+	Rsc *string `json:"rsc,omitempty"`
+	RscPattern *string `json:"rsc-pattern,omitempty"`
+	Role *string `json:"role,omitempty"`
+	Score *string `json:"score,omitempty"`
+	Node *string `json:"node,omitempty"`
+	ResourceSets []ResourceSet `json:"resource-sets,omitempty"`
+	ResourceDiscovery *string `json:"resource-discovery,omitempty"`
+	Rules []Rule `json:"rules,omitempty"`
 }
 
 type Colocation struct {
 	Constraint
-	Score *string
-	ScoreAttribute *string
-	ScoreAttributeMangle *string
-	ResourceSets []ResourceSet
-	Rsc *string
-	WithRsc *string
-	NodeAttribute *string
-	RscRole *string
-	WithRscRole *string
+	Score *string `json:"score,omitempty"`
+	ScoreAttribute *string `json:"score-attribute,omitempty"`
+	ScoreAttributeMangle *string `json:"score-attribute-mangle,omitempty"`
+	ResourceSets []ResourceSet `json:"resource-sets,omitempty"`
+	Rsc *string `json:"rsc,omitempty"`
+	WithRsc *string `json:"with-rsc,omitempty"`
+	NodeAttribute *string `json:"node-attribute,omitempty"`
+	RscRole *string `json:"rsc-role,omitempty"`
+	WithRscRole *string `json:"with-rsc-role,omitempty"`
 }
 
 type Order struct {
 	Constraint
-	Symmetrical *bool
-	RequireAll *bool
-	Score *string
-	Kind *string
-	ResourceSets []ResourceSet
-	First *string
-	Then *string
-	FirstAction *string
-	ThenAction *string
+	Symmetrical *bool `json:"symmetrical,omitempty"`
+	RequireAll *bool `json:"require-all,omitempty"`
+	Score *string `json:"score,omitempty"`
+	Kind *string `json:"kind,omitempty"`
+	ResourceSets []ResourceSet `json:"resource-sets,omitempty"`
+	First *string `json:"first,omitempty"`
+	Then *string `json:"then,omitempty"`
+	FirstAction *string `json:"first-action,omitempty"`
+	ThenAction *string `json:"then-action,omitempty"`
 }
 
 type Ticket struct {
 	Constraint
-	ResourceSets []ResourceSet
-	Rsc *string
-	RscRole *string
-	Ticket string
-	LossPolicy *string
+	ResourceSets []ResourceSet `json:"resource-sets,omitempty"`
+	Rsc *string `json:"rsc,omitempty"`
+	RscRole *string `json:"rsc-role,omitempty"`
+	Ticket string `json:"ticket"`
+	LossPolicy *string `json:"loss-policy,omitempty"`
 }
 
 type Node struct {
-	Id string
-	Uname string
-	Type *string
-	Description *string
-	Score *string
-	Attributes []AttributeSet
-	Utilization []AttributeSet
+	Id string `json:"id"`
+	Uname string `json:"uname"`
+	Type *string `json:"type,omitempty"`
+	Description *string `json:"description,omitempty"`
+	Score *string `json:"score,omitempty"`
+	Attributes []AttributeSet `json:"attributes,omitempty"`
+	Utilization []AttributeSet `json:"utilization,omitempty"`
 }
 
 type FencingLevel struct {
-	Id string
-	Target *string
-	TargetPattern *string
-	TargetAttribute *string
-	TargetValue *string
-	Index int
-	Devices string
+	Id string `json:"id"`
+	Target *string `json:"target,omitempty"`
+	TargetPattern *string `json:"target-pattern,omitempty"`
+	TargetAttribute *string `json:"target-attribute,omitempty"`
+	TargetValue *string `json:"target-value,omitempty"`
+	Index int `json:"index"`
+	Devices string `json:"devices"`
 }
 
 type AclTarget struct {
-	Id string
-	Roles []string
+	Id string `json:"id"`
+	Roles []string `json:"roles,omitempty"`
 }
 
 type AclPermission struct {
-	Id string
-	Kind string
-	Xpath *string
-	Reference *string
-	ObjectType *string
-	Attribute *string
-	Description *string
+	Id string `json:"id"`
+	Kind string `json:"kind"`
+	Xpath *string `json:"xpath,omitempty"`
+	Reference *string `json:"reference,omitempty"`
+	ObjectType *string `json:"object-type,omitempty"`
+	Attribute *string `json:"attribute,omitempty"`
+	Description *string `json:"description,omitempty"`
 }
 
 type AclRole struct {
-	Id string
-	Description *string
-	Permissions []AclPermission
+	Id string `json:"id"`
+	Description *string `json:"description,omitempty"`
+	Permissions []AclPermission `json:"permissions,omitempty"`
 }
 
 type Tag struct {
-	Id string
-	References []string
+	Id string `json:"id"`
+	References []string `json:"references,omitempty"`
 }
 
 type Recipient struct {
-	Id string
-	Description *string
-	Value string
-	Meta []AttributeSet
-	Attributes []AttributeSet
+	Id string `json:"id"`
+	Description *string `json:"description,omitempty"`
+	Value string `json:"value"`
+	Meta []AttributeSet `json:"meta,omitempty"`
+	Attributes []AttributeSet `json:"attributes,omitempty"`
 }
 
 type Alert struct {
-	Id string
-	Description *string
-	Path string
-	Meta []AttributeSet
-	Attributes []AttributeSet
-	Recipients []Recipient
+	Id string `json:"id"`
+	Description *string `json:"description,omitempty"`
+	Path string `json:"path"`
+	Meta []AttributeSet `json:"meta,omitempty"`
+	Attributes []AttributeSet `json:"attributes,omitempty"`
+	Recipients []Recipient `json:"recipients,omitempty"`
 }
 
 type Configuration struct {
-	CrmConfig []AttributeSet
-	RscDefaults []AttributeSet
-	OpDefaults []AttributeSet
-	Nodes []Node
-	Resources []CibObject
-	Constraints []CibObject
-	Fencing []FencingLevel
-	AclTargets []AclTarget
-	AclRoles []AclRole
-	Tags []Tag
-	Alerts []Alert
+	CrmConfig []AttributeSet `json:"crm_config,omitempty"`
+	RscDefaults []AttributeSet `json:"rsc_defaults,omitempty"`
+	OpDefaults []AttributeSet `json:"op_defaults,omitempty"`
+	Nodes []Node `json:"nodes,omitempty"`
+	Resources []CibObject `json:"resources,omitempty"`
+	Constraints []CibObject `json:"constraints,omitempty"`
+	Fencing []FencingLevel `json:"fencing-topology,omitempty"`
+	AclTargets []AclTarget `json:"acl-targets,omitempty"`
+	AclRoles []AclRole `json:"acl-roles,omitempty"`
+	Tags []Tag `json:"tags,omitempty"`
+	Alerts []Alert `json:"alerts,omitempty"`
 }
 
 type ResourceStateOp struct {
