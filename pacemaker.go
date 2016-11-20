@@ -67,10 +67,7 @@ const (
 	Command CibConnection = C.cib_command
 )
 
-type CibObject interface {
-	GetId() string
-	IsModified() bool
-	ToCli() string
+type CibObject struct {
 }
 
 type CibSerialize interface {
@@ -92,7 +89,263 @@ type Cib struct {
 	Status Status
 }
 
+type RuleExpression struct {
+	Id string
+	Attribute string
+	Operation string
+	Value *string
+	Type *string
+}
+
+type DateDuration struct {
+	Id string
+	Hours *string
+	Monthdays *string
+	Weekdays *string
+	Yearsdays *string
+	Months *string
+	Weeks *string
+	Years *string
+	Weekyears *string
+	Moon *string
+}
+
+type DateExpression struct {
+	Id string
+	Operation *string
+	Start *string
+	End *string
+	Duration *DateDuration
+}
+
+type Rule struct {
+	IdRef *string
+	Id *string
+	Score *string
+	ScoreAttribute *string
+	BooleanOp *string
+	Role *string
+	Expressions []interface{}
+}
+
+type NVPair struct {
+	Id *string
+	IdRef *string
+	Name *string
+	Value *string
+}
+
+type AttributeSet struct {
+	Id *string
+	IdRef *string
+	Score *string
+	Rules []Rule
+	Values []NVPair
+}
+
+type Operation struct {
+	Id string
+	Name string
+	Interval string
+	Description *string
+	StartDelay *string
+	IntervalOrigin *string
+	Timeout *string
+	Enabled *bool
+	RecordPending *bool
+	Role *string
+	Requires *string
+	OnFail *string
+	Meta []AttributeSet
+	Attributes []AttributeSet
+}
+
+type OperationSet struct {
+	Id *string
+	IdRef *string
+	Operations []Operation
+}
+
+type Resource struct {
+	Id string
+	Description *string
+	Attributes []AttributeSet
+	Meta []AttributeSet
+}
+
+type Primitive struct {
+	Resource
+	Type *string
+	Class *string
+	Provider *string
+	Template *string
+	Utilization []AttributeSet
+	Operations []OperationSet
+}
+
+type Template struct {
+	Resource
+	Type string
+	Class string
+	Provider *string
+	Utilization []AttributeSet
+	Operations []OperationSet
+}
+
+
+type Group struct {
+	Resource
+	Children []Primitive
+}
+
+type Clone struct {
+	Resource
+	Child CibObject
+}
+
+type Master struct {
+	Resource
+	Child CibObject
+}
+
+type Constraint struct {
+	Id string
+}
+
+type ResourceSet struct {
+	Id *string
+	IdRef *string
+	Sequential *bool
+	RequireAll *bool
+	Ordering *string
+	Action *string
+	Role *string
+	Score *string
+	Resources []string
+}
+
+type Location struct {
+	Constraint
+	Rsc *string
+	RscPattern *string
+	Role *string
+	Score *string
+	Node *string
+	ResourceSets []ResourceSet
+	ResourceDiscovery *string
+	Rules []Rule
+}
+
+type Colocation struct {
+	Constraint
+	Score *string
+	ScoreAttribute *string
+	ScoreAttributeMangle *string
+	ResourceSets []ResourceSet
+	Rsc *string
+	WithRsc *string
+	NodeAttribute *string
+	RscRole *string
+	WithRscRole *string
+}
+
+type Order struct {
+	Constraint
+	Symmetrical *bool
+	RequireAll *bool
+	Score *string
+	Kind *string
+	ResourceSets []ResourceSet
+	First *string
+	Then *string
+	FirstAction *string
+	ThenAction *string
+}
+
+type Ticket struct {
+	Constraint
+	ResourceSets []ResourceSet
+	Rsc *string
+	RscRole *string
+	Ticket string
+	LossPolicy *string
+}
+
+type Node struct {
+	Id string
+	Uname string
+	Type *string
+	Description *string
+	Score *string
+	Attributes []AttributeSet
+	Utilization []AttributeSet
+}
+
+type FencingLevel struct {
+	Id string
+	Target *string
+	TargetPattern *string
+	TargetAttribute *string
+	TargetValue *string
+	Index int
+	Devices string
+}
+
+type AclTarget struct {
+	Id string
+	Roles []string
+}
+
+type AclPermission struct {
+	Id string
+	Kind string
+	Xpath *string
+	Reference *string
+	ObjectType *string
+	Attribute *string
+	Description *string
+}
+
+type AclRole struct {
+	Id string
+	Description *string
+	Permissions []AclPermission
+}
+
+type Tag struct {
+	Id string
+	References []string
+}
+
+type Recipient struct {
+	Id string
+	Description *string
+	Value string
+	Meta []AttributeSet
+	Attributes []AttributeSet
+}
+
+type Alert struct {
+	Id string
+	Description *string
+	Path string
+	Meta []AttributeSet
+	Attributes []AttributeSet
+	Recipients []Recipient
+}
+
 type Configuration struct {
+	CrmConfig []AttributeSet
+	RscDefaults []AttributeSet
+	OpDefaults []AttributeSet
+	Nodes []Node
+	Resources []CibObject
+	Constraints []CibObject
+	Fencing []FencingLevel
+	AclTargets []AclTarget
+	AclRoles []AclRole
+	Tags []Tag
+	Alerts []Alert
 }
 
 type ResourceStateOp struct {
