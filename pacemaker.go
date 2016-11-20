@@ -593,6 +593,19 @@ func init() {
 	C.free(unsafe.Pointer(s))
 }
 
+var ValidOperationRole = []string{"Stopped", "Started", "Slave", "Master"}
+var ValidOperationRequires = []string{"nothing", "quorum", "fencing", "unfencing"}
+var ValidOperationOnFail = []string{"ignore", "block", "stop", "restart", "standby", "fence", "restart-container"}
+var ValidResourceClass = []string{"ocf", "lsb", "heartbeat", "stonith", "upstart", "service", "systemd", "nagios"}
+var ValidConstraintOrdering = []string{"group", "listed"}
+var ValidTicketLossPolicy = []string{"stop", "demote", "fence", "freeze"}
+var ValidAttributeDiscovery = []string{"always", "never", "exclusive"}
+var ValidAttributeAction = []string{"start", "promote", "demote", "stop"}
+var ValidAttributeRole = []string{"Stopped", "Started", "Master", "Slave"}
+var ValidOrderType = []string{"Optional", "Mandatory", "Serialize"}
+var ValidPermissionKind = []string{"read", "write", "deny"}
+var ValidNodeType = []string{"normal", "member", "ping", "remote"}
+
 // Read XML configuration into an object tree.
 // To save, we want a series of crmsh commands
 // so no need for objects -> xml serialization
