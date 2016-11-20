@@ -160,6 +160,37 @@ func NewCibFile(filename string) *Cib {
 	return &cib
 }
 
+func NewCibShadow(name string) *Cib {
+	var cib Cib
+	s := C.CString(name)
+	cib.cCib = C.cib_shadow_new(s)
+	C.free(unsafe.Pointer(s))
+	return &cib
+}
+
+func GetShadowFile(name string) string {
+	s := C.CString(name)
+	defer C.free(unsafe.Pointer(s))
+	return C.GoString(C.get_shadow_file(s))
+}
+
+func NewCibRemote(server, user, passwd string, port int, encrypted bool) *Cib {
+	var cib Cib
+	s := C.CString(server)
+	u := C.CString(user)
+	p := C.CString(passwd)
+	var e C.int = 0
+	if encrypted {
+		e = 1
+	}
+	cib.cCib = C.cib_remote_new(s, u, p, (C.int)(port), (C.gboolean)(e))
+	C.free(unsafe.Pointer(s))
+	C.free(unsafe.Pointer(u))
+	C.free(unsafe.Pointer(p))
+	return &cib
+}
+
+
 func (cib *Cib) SignOn(connection CibConnection) error {
 	if cib.cCib.state == C.cib_connected_query || cib.cCib.state == C.cib_connected_command {
 		return nil
