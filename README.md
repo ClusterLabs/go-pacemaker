@@ -22,8 +22,8 @@ Major missing features:
 Right now, I'm mainly focused on coming up with a good mapping between
 native Go code and the CIB. The current version as of this work is
 Pacemaker 1.1.15 with 1.1.16 to be released very soon, and I am making
-no effort to stay compatible with older versions. I'm also not
-conciously making the code tied to a specific version of Pacemaker.
+no effort to stay compatible with older versions. On the flip side, no
+effort is being made to tie the code to a specific release either.
 
 ## Compilation
 
