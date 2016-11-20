@@ -5,6 +5,7 @@ import (
 	"unsafe"
 	"fmt"
 	"encoding/xml"
+	"encoding/json"
 	"bytes"
 )
 
@@ -66,6 +67,19 @@ const (
 	Command CibConnection = C.cib_command
 )
 
+type CibObject interface {
+	GetId() string
+	IsModified() bool
+	ToCli() string
+}
+
+type CibSerialize interface {
+	FromXml([]byte) CibObject
+	FromJson([]byte) CibObject
+	ToJson() []byte
+	ToXml() []byte
+}
+
 // Root entity representing the CIB. Can be
 // populated with CIB data if the Decode
 // method is used.
@@ -82,44 +96,44 @@ type Configuration struct {
 }
 
 type ResourceStateOp struct {
-	Operation string `xml:"operation,attr"`
-	CallId int `xml:"call-id,attr"`
-	Rc int `xml:"rc-code,attr"`
-	LastRun string `xml:"last-run,attr"`
-	LastRcChange string `xml:"last-rc-change,attr"`
-	ExecTime string `xml:"exec-time,attr"`
-	QueueTime string `xml:"queue-time,attr"`
-	OnNode string `xml:"on_node,attr"`
-	ExitReason string `xml:"exit-reason,attr"`
+	Operation string `xml:"operation,attr" json:"operation,omitempty"`
+	CallId int `xml:"call-id,attr" json:"call-id,omitempty"`
+	Rc int `xml:"rc-code,attr" json:"rc-code,omitempty"`
+	LastRun string `xml:"last-run,attr" json:"last-run,omitempty"`
+	LastRcChange string `xml:"last-rc-change,attr" json:"last-rc-change,omitempty"`
+	ExecTime string `xml:"exec-time,attr" json:"exec-time,omitempty"`
+	QueueTime string `xml:"queue-time,attr" json:"queue-time,omitempty"`
+	OnNode string `xml:"on_node,attr" json:"on-node,omitempty"`
+	ExitReason string `xml:"exit-reason,attr" json:"exit-reason,omitempty"`
 }
 
 type ResourceState struct {
-	Id string `xml:"id,attr"`
-	Type string `xml:"type,attr"`
-	Class string `xml:"class,attr"`
-	Provider string `xml:"provider,attr"`
-	Ops []ResourceStateOp `xml:"lrm_rsc_op"`
+	Id string `xml:"id,attr" json:"id,omitempty"`
+	Type string `xml:"type,attr" json:"type,omitempty"`
+	Class string `xml:"class,attr" json:"class,omitempty"`
+	Provider string `xml:"provider,attr" json:"provider,omitempty"`
+	Ops []ResourceStateOp `xml:"lrm_rsc_op" json:"ops,omitempty"`
 }
 
 type SimpleNVPair struct {
-	Name string `xml:"name,attr"`
-	Value string `xml:"value,attr"`
+	Name string `xml:"name,attr" json:"name"`
+	Value string `xml:"value,attr" json:"value"`
 }
 
 type NodeState struct {
-	Id string `xml:"id,attr"`
-	Uname string `xml:"uname,attr"`
-	InCCM bool `xml:"in_ccm,attr"`
-	Crmd string `xml:"crmd,attr"`
-	CrmDebugOrigin string `xml:"crm-debug-origin,attr"`
-	Join string `xml:"join,attr"`
-	Expected string `xml:"expected,attr"`
-	Resources []ResourceState `xml:"lrm>lrm_resources>lrm_resource"`
-	Attributes []SimpleNVPair `xml:"transient_attributes>instance_attributes>nvpair"`
+	Id string `xml:"id,attr" json:"id,omitempty"`
+	Uname string `xml:"uname,attr" json:"uname,omitempty"`
+	InCcm bool `xml:"in_ccm,attr" json:"in-ccm,omitempty"`
+	Crmd string `xml:"crmd,attr" json:"crmd,omitempty"`
+	CrmDebugOrigin string `xml:"crm-debug-origin,attr" json:"crm-debug-origin,omitempty"`
+	Join string `xml:"join,attr" json:"join,omitempty"`
+	Expected string `xml:"expected,attr" json:"expected,omitempty"`
+	Resources []ResourceState `xml:"lrm>lrm_resources>lrm_resource" json:"resources,omitempty"`
+	Attributes []SimpleNVPair `xml:"transient_attributes>instance_attributes>nvpair" json:"attributes,omitempty"`
 }
 
 type Status struct {
-	NodeState []NodeState `xml:"node_state"`
+	NodeState []NodeState `xml:"node_state" json:"node-state"`
 }
 
 type CibVersion struct {
@@ -135,6 +149,14 @@ func (ver *CibVersion) String() string {
 func NewCib() *Cib {
 	var cib Cib
 	cib.cCib = C.cib_new()
+	return &cib
+}
+
+func NewCibFile(filename string) *Cib {
+	var cib Cib
+	s := C.CString(filename)
+	cib.cCib = C.cib_file_new(s)
+	C.free(unsafe.Pointer(s))
 	return &cib
 }
 
@@ -275,6 +297,10 @@ func (cib *Cib) QueryXPathNoChildren(xpath string) ([]byte, error) {
 	defer C.free(unsafe.Pointer(buffer))
 
 	return C.GoBytes(unsafe.Pointer(buffer), (C.int)(C.strlen(buffer))), nil
+}
+
+func (status *Status) ToJson() ([]byte, error) {
+	return json.Marshal(status)
 }
 
 func init() {

@@ -1,25 +1,20 @@
 package pacemaker_test
 
 import (
-	"os"
 	"fmt"
-	"flag"
 	"testing"
 	"log"
+	"strings"
+	"bytes"
+	"encoding/json"
 	"github.com/krig/go-pacemaker"
 )
 
 
-func TestMain(m *testing.M) {
-	flag.Parse()
-	os.Setenv("CIB_file", "testdata/simple.xml")
-	os.Exit(m.Run())
-}
-
 func TestDecode(t *testing.T) {
 	var err error
 
-	cib := pacemaker.NewCib()
+	cib := pacemaker.NewCibFile("testdata/simple.xml")
 	defer cib.Delete()
 	err = cib.SignOn(pacemaker.Query)
 	if err != nil {
@@ -35,7 +30,7 @@ func TestDecode(t *testing.T) {
 
 
 func TestVersion(t *testing.T) {
-	cib := pacemaker.NewCib()
+	cib := pacemaker.NewCibFile("testdata/simple.xml")
 	defer cib.Delete()
 	err := cib.SignOn(pacemaker.Query)
 	if err != nil {
@@ -57,8 +52,41 @@ func TestVersion(t *testing.T) {
 }
 
 
+func TestStatusJson(t *testing.T) {
+	cib := pacemaker.NewCibFile("testdata/exit-reason.xml")
+	defer cib.Delete()
+	err := cib.SignOn(pacemaker.Query)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cib.SignOff()
+
+	err = cib.Decode()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	data, err := cib.Status.ToJson()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+    var prettyJSON bytes.Buffer
+    err = json.Indent(&prettyJSON, data, "", "  ")
+    if err != nil {
+		t.Fatal(err)
+    }
+
+	jsonstr := prettyJSON.String()
+
+	if !strings.Contains(jsonstr, "\"id\": \"gctvanas-lvm\"") {
+		t.Fatal("Expected gctvanas-lvm, got ", jsonstr)
+	}
+}
+
+
 func ExampleQuery() {
-	cib := pacemaker.NewCib()
+	cib := pacemaker.NewCibFile("testdata/simple.xml")
 	defer cib.Delete()
 	err := cib.SignOn(pacemaker.Query)
 	if err != nil {
@@ -76,7 +104,7 @@ func ExampleQuery() {
 }
 
 func ExampleQueryXPath() {
-	cib := pacemaker.NewCib()
+	cib := pacemaker.NewCibFile("testdata/simple.xml")
 	defer cib.Delete()
 	err := cib.SignOn(pacemaker.Query)
 	if err != nil {
@@ -96,7 +124,7 @@ func ExampleQueryXPath() {
 func ExampleDecode() {
 	var err error
 
-	cib := pacemaker.NewCib()
+	cib := pacemaker.NewCibFile("testdata/simple.xml")
 	defer cib.Delete()
 	err = cib.SignOn(pacemaker.Query)
 	if err != nil {
@@ -130,8 +158,7 @@ func findOps(cib *pacemaker.Cib, nodename string, rscname string) []pacemaker.Re
 func ExampleDecodeStatus() {
 	var err error
 
-	os.Setenv("CIB_file", "testdata/exit-reason.xml")
-	cib := pacemaker.NewCib()
+	cib := pacemaker.NewCibFile("testdata/exit-reason.xml")
 	defer cib.Delete()
 	err = cib.SignOn(pacemaker.Query)
 	if err != nil {
