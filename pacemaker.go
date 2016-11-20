@@ -7,8 +7,8 @@ import (
 	"encoding/xml"
 	"encoding/json"
 	"bytes"
-	"log"
-	"reflect"
+//	"log"
+//	"reflect"
 	"strings"
 )
 
@@ -107,6 +107,8 @@ type descMixin struct {
 	Description *string `xml:"description,attr,omitempty" json:"description,omitempty"`
 }
 
+// expression
+// can be marshalled
 type RuleExpression struct {
 	idMixin
 	Attribute string `xml:"attribute,attr" json:"attribute"`
@@ -658,42 +660,6 @@ var ValidAttributeRole = []string{"Stopped", "Started", "Master", "Slave"}
 var ValidOrderType = []string{"Optional", "Mandatory", "Serialize"}
 var ValidPermissionKind = []string{"read", "write", "deny"}
 var ValidNodeType = []string{"normal", "member", "ping", "remote"}
-
-
-func decodeTagImpl(decoder *xml.Decoder, se *xml.StartElement,
-	attrfn func(attr xml.Attr) bool, elemfn  func(decoder *xml.Decoder, parent *xml.StartElement, current *xml.StartElement, depth int) bool) {
-	depth := 1
-	var ret bool
-	for _, attr := range se.Attr {
-		ret = attrfn(attr)
-		if ret {
-			return
-		}
-	}
-	for {
-		t, _ := decoder.Token()
-		if t == nil {
-			break
-		}
-		switch ce := t.(type) {
-		case xml.StartElement:
-			if ce.Name.Local == se.Name.Local {
-				depth++
-			}
-			ret = elemfn(decoder, se, &ce, depth)
-			if ret {
-				return
-			}
-		case xml.EndElement:
-			if ce.Name.Local == se.Name.Local {
-				depth--
-				if depth == 0 {
-					return
-				}
-			}
-		}
-	}
-}
 
 
 func stringToBool(bstr string) bool {
