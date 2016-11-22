@@ -84,6 +84,39 @@ func TestStatusJson(t *testing.T) {
 	}
 }
 
+func TestCibJson(t *testing.T) {
+	cib := pacemaker.NewCibFile("testdata/exit-reason.xml")
+	defer cib.Delete()
+	err := cib.SignOn(pacemaker.Query)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cib.SignOff()
+
+	err = cib.Decode()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	data, err := cib.ToJson()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+    var prettyJSON bytes.Buffer
+    err = json.Indent(&prettyJSON, data, "", "  ")
+    if err != nil {
+		t.Fatal(err)
+    }
+
+	jsonstr := prettyJSON.String()
+	log.Printf("%s", jsonstr)
+
+	if !strings.Contains(jsonstr, "gctvanas-fs2o-meta_attributes-clone-node-max") {
+		t.Fatal("Expected configuration, got ", jsonstr)
+	}
+}
+
 
 func ExampleQuery() {
 	cib := pacemaker.NewCibFile("testdata/simple.xml")
@@ -137,7 +170,7 @@ func ExampleDecode() {
 		log.Fatal(err)
 	}
 
-	fmt.Printf("%v", cib.Attributes["validate-with"])
+	fmt.Printf("%v", *cib.ValidateWith)
 	// Output: pacemaker-1.2
 }
 

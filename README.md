@@ -17,6 +17,7 @@ Major missing features:
 * Decoding / encoding configuration section
 * Writing changes back to the CIB
 
+
 ## Compatibility
 
 Right now, I'm mainly focused on coming up with a good mapping between
