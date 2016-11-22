@@ -12,31 +12,25 @@ import (
 
 
 func TestDecode(t *testing.T) {
-	var err error
-
-	cib := pacemaker.NewCibFile("testdata/simple.xml")
-	defer cib.Delete()
-	err = cib.SignOn(pacemaker.Query)
+	cib, err := pacemaker.OpenCib(pacemaker.FromFile("testdata/simple.xml"))
+	defer cib.Close()
 	if err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
-	defer cib.SignOff()
 
 	err = cib.Decode()
 	if err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
 }
 
 
 func TestVersion(t *testing.T) {
-	cib := pacemaker.NewCibFile("testdata/simple.xml")
-	defer cib.Delete()
-	err := cib.SignOn(pacemaker.Query)
+	cib, err := pacemaker.OpenCib(pacemaker.FromFile("testdata/simple.xml"))
+	defer cib.Close()
 	if err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
-	defer cib.SignOff()
 
 	ver, err := cib.Version()
 	if err != nil {
@@ -53,13 +47,11 @@ func TestVersion(t *testing.T) {
 
 
 func TestStatusJson(t *testing.T) {
-	cib := pacemaker.NewCibFile("testdata/exit-reason.xml")
-	defer cib.Delete()
-	err := cib.SignOn(pacemaker.Query)
+	cib, err := pacemaker.OpenCib(pacemaker.FromFile("testdata/exit-reason.xml"))
+	defer cib.Close()
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer cib.SignOff()
 
 	err = cib.Decode()
 	if err != nil {
@@ -85,13 +77,11 @@ func TestStatusJson(t *testing.T) {
 }
 
 func TestCibJson(t *testing.T) {
-	cib := pacemaker.NewCibFile("testdata/exit-reason.xml")
-	defer cib.Delete()
-	err := cib.SignOn(pacemaker.Query)
+	cib, err := pacemaker.OpenCib(pacemaker.FromFile("testdata/exit-reason.xml"))
+	defer cib.Close()
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer cib.SignOff()
 
 	err = cib.Decode()
 	if err != nil {
@@ -119,13 +109,11 @@ func TestCibJson(t *testing.T) {
 
 
 func ExampleQuery() {
-	cib := pacemaker.NewCibFile("testdata/simple.xml")
-	defer cib.Delete()
-	err := cib.SignOn(pacemaker.Query)
+	cib, err := pacemaker.OpenCib(pacemaker.FromFile("testdata/simple.xml"))
+	defer cib.Close()
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer cib.SignOff()
 
 	xml, err := cib.Query()
 	if err != nil {
@@ -137,13 +125,11 @@ func ExampleQuery() {
 }
 
 func ExampleQueryXPath() {
-	cib := pacemaker.NewCibFile("testdata/simple.xml")
-	defer cib.Delete()
-	err := cib.SignOn(pacemaker.Query)
+	cib, err := pacemaker.OpenCib(pacemaker.FromFile("testdata/simple.xml"))
+	defer cib.Close()
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer cib.SignOff()
 
 	xml, err := cib.QueryXPath("//nodes/node[@id=\"xxx\"]")
 	if err != nil {
@@ -155,15 +141,11 @@ func ExampleQueryXPath() {
 }
 
 func ExampleDecode() {
-	var err error
-
-	cib := pacemaker.NewCibFile("testdata/simple.xml")
-	defer cib.Delete()
-	err = cib.SignOn(pacemaker.Query)
+	cib, err := pacemaker.OpenCib(pacemaker.FromFile("testdata/simple.xml"))
+	defer cib.Close()
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer cib.SignOff()
 
 	err = cib.Decode()
 	if err != nil {
@@ -189,22 +171,18 @@ func findOps(cib *pacemaker.Cib, nodename string, rscname string) []pacemaker.Re
 
 
 func ExampleDecodeStatus() {
-	var err error
-
-	cib := pacemaker.NewCibFile("testdata/exit-reason.xml")
-	defer cib.Delete()
-	err = cib.SignOn(pacemaker.Query)
+	cib, err := pacemaker.OpenCib(pacemaker.FromFile("testdata/exit-reason.xml"))
+	defer cib.Close()
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer cib.SignOff()
 
 	err = cib.Decode()
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	ops := findOps(cib, "node1", "gctvanas-lvm")
-	fmt.Printf(ops[0].ExitReason)
+	//ops := findOps(cib, "node1", "gctvanas-lvm")
+	//fmt.Printf(ops[0].ExitReason)
 	// Output: LVM: targetfs did not activate correctly
 }

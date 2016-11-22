@@ -7,6 +7,10 @@ import (
 	"encoding/xml"
 	"encoding/json"
 	"strings"
+	"bytes"
+	"reflect"
+	"strconv"
+	"log"
 )
 
 /*
@@ -67,9 +71,45 @@ const (
 	Command CibConnection = C.cib_command
 )
 
-type CibObject interface {
-	FromJson([]byte) (error)
-	ToJson() ([]byte, error)
+type CibOpenConfig struct {
+	connection CibConnection
+	file string
+	shadow string
+	server string
+	user string
+	passwd string
+	port int
+	encrypted bool
+}
+
+func ForQuery(config *CibOpenConfig) {
+	config.connection = Query
+}
+
+func ForCommand(config *CibOpenConfig) {
+	config.connection = Command
+}
+
+func FromFile(file string) func(*CibOpenConfig) {
+	return func(config *CibOpenConfig) {
+		config.file = file
+	}
+}
+
+func FromShadow(shadow string) func(*CibOpenConfig) {
+	return func(config *CibOpenConfig) {
+		config.shadow = shadow
+	}
+}
+
+func FromRemote(server, user, passwd string, port int, encrypted bool) func (*CibOpenConfig) {
+	return func(config *CibOpenConfig) {
+		config.server = server
+		config.user = user
+		config.passwd = passwd
+		config.port = port
+		config.encrypted = encrypted
+	}
 }
 
 // Root entity representing the CIB. Can be
@@ -95,11 +135,6 @@ type Cib struct {
 	ExecutionDate *string `xml:"execution-date,attr,omitempty" json:"execution-date,attr,omitempty"`
 	Configuration Configuration `xml:"configuration" json:"configuration"`
 	Status Status `xml:"status" json:"status"`
-}
-
-type cibAnyHolder struct {
-	XMLName xml.Name
-	XML     string `xml:",innerxml"`
 }
 
 type idMixin struct {
@@ -168,7 +203,7 @@ type CibRule struct {
 	ScoreAttribute *string `xml:"score-attribute,attr,omitempty" json:"score-attribute,omitempty"`
 	BooleanOp *string `xml:"boolean-op,attr,omitempty" json:"boolean-op,omitempty"`
 	Role *string `xml:"role,attr,omitempty" json:"role,omitempty" validate:"ValidAttributeRole"`
-	Children []cibAnyHolder `xml:",any" json:"children,omitempty"`
+	Elements []interface{} `choice:"CibRule CibRuleExpression CibDateExpression" json:"elements,omitempty"`
 }
 
 type CibNVPair struct {
@@ -181,7 +216,8 @@ type CibNVPair struct {
 type cibAttributeSetMixin struct {
 	idRefMixin
 	scoreMixin
-	Children []cibAnyHolder `xml:",any" json:"children,omitempty"`
+	Attributes []CibInstanceAttributes `xml:"instance_attributes" json:"instance_attributes,omitempty"`
+	Meta []CibMetaAttributes `xml:"meta_attributes" json:"meta_attributes,omitempty"`
 }
 
 type CibInstanceAttributes struct {
@@ -263,13 +299,13 @@ type CibGroup struct {
 type CibClone struct {
 	XMLName xml.Name `xml:"clone" json:"-"`
 	cibResourceMixin
-	Child cibAnyHolder `xml:",any" json:"child"`
+	Child interface{} `choice:"CibGroup CibPrimitive" json:"child"`
 }
 
 type CibMaster struct {
 	XMLName xml.Name `xml:"master" json:"-"`
 	cibResourceMixin
-	Child []cibAnyHolder `xml:",any" json:"child"`
+	Child interface{} `choice:"CibGroup CibPrimitive" json:"child"`
 }
 
 type cibConstraintMixin struct {
@@ -514,26 +550,45 @@ func (ver *CibVersion) String() string {
 	return fmt.Sprintf("%d:%d:%d", ver.AdminEpoch, ver.Epoch, ver.NumUpdates)
 }
 
-func NewCib() *Cib {
+func OpenCib(options ...func (*CibOpenConfig)) (*Cib, error) {
 	var cib Cib
-	cib.cCib = C.cib_new()
-	return &cib
-}
+	config := CibOpenConfig{}
+	for _, opt := range options {
+		opt(&config)
+	}
+	if config.connection != Query && config.connection != Command {
+		config.connection = Query
+	}
+	if config.file != "" {
+		s := C.CString(config.file)
+		defer C.free(unsafe.Pointer(s))
+		cib.cCib = C.cib_file_new(s)
+	} else if config.shadow != "" {
+		s := C.CString(config.shadow)
+		defer C.free(unsafe.Pointer(s))
+		cib.cCib = C.cib_shadow_new(s)
+	} else if config.server != "" {
+		s := C.CString(config.server)
+		u := C.CString(config.user)
+		p := C.CString(config.passwd)
+		defer C.free(unsafe.Pointer(s))
+		defer C.free(unsafe.Pointer(u))
+		defer C.free(unsafe.Pointer(p))
+		var e C.int = 0
+		if config.encrypted {
+			e = 1
+		}
+		cib.cCib = C.cib_remote_new(s, u, p, (C.int)(config.port), (C.gboolean)(e))
+	} else {
+		cib.cCib = C.cib_new()
+	}
 
-func NewCibFile(filename string) *Cib {
-	var cib Cib
-	s := C.CString(filename)
-	cib.cCib = C.cib_file_new(s)
-	C.free(unsafe.Pointer(s))
-	return &cib
-}
+	rc := C.go_cib_signon(cib.cCib, C.crm_system_name, (uint32)(config.connection))
+	if rc != C.pcmk_ok {
+		return nil, formatErrorRc((int)(rc))
+	}
 
-func NewCibShadow(name string) *Cib {
-	var cib Cib
-	s := C.CString(name)
-	cib.cCib = C.cib_shadow_new(s)
-	C.free(unsafe.Pointer(s))
-	return &cib
+	return &cib, nil
 }
 
 func GetShadowFile(name string) string {
@@ -542,45 +597,14 @@ func GetShadowFile(name string) string {
 	return C.GoString(C.get_shadow_file(s))
 }
 
-func NewCibRemote(server, user, passwd string, port int, encrypted bool) *Cib {
-	var cib Cib
-	s := C.CString(server)
-	u := C.CString(user)
-	p := C.CString(passwd)
-	var e C.int = 0
-	if encrypted {
-		e = 1
-	}
-	cib.cCib = C.cib_remote_new(s, u, p, (C.int)(port), (C.gboolean)(e))
-	C.free(unsafe.Pointer(s))
-	C.free(unsafe.Pointer(u))
-	C.free(unsafe.Pointer(p))
-	return &cib
-}
-
-
-func (cib *Cib) SignOn(connection CibConnection) error {
-	if cib.cCib.state == C.cib_connected_query || cib.cCib.state == C.cib_connected_command {
-		return nil
-	}
-
-	rc := C.go_cib_signon(cib.cCib, C.crm_system_name, (uint32)(connection))
-	if rc != C.pcmk_ok {
-		return formatErrorRc((int)(rc))
-	}
-	return nil
-}
-
-func (cib *Cib) SignOff() error {
+func (cib *Cib) Close() error {
 	rc := C.go_cib_signoff(cib.cCib)
 	if rc != C.pcmk_ok {
 		return formatErrorRc((int)(rc))
 	}
-	return nil
-}
-
-func (cib *Cib) Delete() {
 	C.cib_delete(cib.cCib)
+	cib.cCib = nil
+	return nil
 }
 
 func (cib *Cib) queryImpl(xpath string, nochildren bool) (*C.xmlNode, error) {
@@ -729,14 +753,199 @@ var ValidPermissionKind = []string{"read", "write", "deny"}
 var ValidNodeType = []string{"normal", "member", "ping", "remote"}
 
 
-func stringToBool(bstr string) bool {
+func IsTrue(bstr string) bool {
 	sl := strings.ToLower(bstr)
 	return sl == "true" || sl == "on" || sl == "yes" || sl == "y" || sl == "1"
+}
+
+
+type stack struct {
+	s []interface{}
+}
+
+func (s *stack) Push(v interface{}) {
+	s.s = append(s.s, v)
+}
+
+func (s *stack) Pop() interface{} {
+	l := len(s.s)
+	e := s.s[l-1]
+	s.s = s.s[:l-1]
+	return e
+}
+
+func (s *stack) Len() int {
+	return len(s.s)
+}
+
+func (s *stack) Top() interface{} {
+	return s.s[len(s.s)-1]
 }
 
 
 // Read XML configuration into an object tree.
 // TODO: Generate object tree from RNG schema
 func (cib *Cib) decodeCibObjects(xmldata []byte) error {
-	return xml.Unmarshal(xmldata, &cib)
+	decoder := xml.NewDecoder(bytes.NewReader(xmldata))
+	elemstack := &stack{make([]interface{}, 0)}
+	for {
+		t, err := decoder.Token()
+		if t == nil {
+			return nil
+		} else if err != nil {
+			return err
+		}
+		switch se := t.(type) {
+		case xml.StartElement:
+			if se.Name.Local == "cib" {
+				elemstack.Push(cib)
+				log.Printf("push on stack: %v %d", cib, elemstack.Len())
+				mapAttributes(cib, &se)
+			} else if elemstack.Len() > 0 {
+				if elemstack.Len() == 1 && se.Name.Local == "status" {
+					elemstack.Push(cib.Status)
+					log.Printf("push on stack: %v %d", cib.Status, elemstack.Len())
+					decoder.DecodeElement(&cib.Status, &se)
+				} else {
+					log.Printf("looking at %v, stack = %v", se.Name.Local, elemstack.Top())
+					f, b := findField(reflect.TypeOf(elemstack.Top()).Elem(), se.Name.Local)
+					if b {
+						log.Printf("findField %v", f)
+						elemstack.Push(reflect.ValueOf(elemstack.Top()).Elem().Field(f.Index[0]))
+						mapAttributes(elemstack.Top(), &se)
+					}
+				}
+			} else {
+				log.Printf("nothing on the stack, looking at %v", se.Name.Local)
+			}
+		case xml.EndElement:
+			if elemstack.Len() > 0 {
+				v := elemstack.Pop()
+				log.Printf("- %v", v)
+			}
+		}
+	}
+}
+
+func mapAttributes(obj interface{}, elem *xml.StartElement) {
+	s := reflect.ValueOf(obj).Elem()
+	for _, attr := range elem.Attr {
+		f, ok := findField(s.Type(), attr.Name.Local)
+		if ok {
+			v := s.Field(f.Index[0])
+			if v.Kind() == reflect.Ptr {
+				if v.IsNil() {
+					v.Set(reflect.New(v.Type().Elem()))
+				}
+				v = v.Elem()
+			}
+			copyValue(v, []byte(attr.Value))
+		}
+	}
+	
+}
+
+func copyValue(dst reflect.Value, src []byte) (err error) {
+	dst0 := dst
+
+	if dst.Kind() == reflect.Ptr {
+		if dst.IsNil() {
+			dst.Set(reflect.New(dst.Type().Elem()))
+		}
+		dst = dst.Elem()
+	}
+
+	// Save accumulated data.
+	switch dst.Kind() {
+	case reflect.Invalid:
+		// Probably a comment.
+	default:
+		log.Fatal("cannot unmarshal into " + dst0.Type().String())
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		itmp, err := strconv.ParseInt(string(src), 10, dst.Type().Bits())
+		if err != nil {
+			return err
+		}
+		dst.SetInt(itmp)
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
+		utmp, err := strconv.ParseUint(string(src), 10, dst.Type().Bits())
+		if err != nil {
+			return err
+		}
+		dst.SetUint(utmp)
+	case reflect.Float32, reflect.Float64:
+		ftmp, err := strconv.ParseFloat(string(src), dst.Type().Bits())
+		if err != nil {
+			return err
+		}
+		dst.SetFloat(ftmp)
+	case reflect.Bool:
+		value, err := strconv.ParseBool(strings.TrimSpace(string(src)))
+		if err != nil {
+			return err
+		}
+		dst.SetBool(value)
+	case reflect.String:
+		dst.SetString(string(src))
+	case reflect.Slice:
+		if len(src) == 0 {
+			// non-nil to flag presence
+			src = []byte{}
+		}
+		dst.SetBytes(src)
+	}
+	return nil
+}
+
+
+func findField(t reflect.Type, name string) (*reflect.StructField, bool) {
+	for i := 0; i < t.NumField(); i++ {
+		f := t.Field(i)
+		tag := f.Tag.Get("xml")
+		tagname := namePartOfXmlTag(tag)
+		if tagname == "" {
+			tagname = f.Name
+		}
+		if tagname == name {
+			return &f, true
+		}
+	}
+	return nil, false
+}
+
+func namePartOfXmlTag(tag string) string {
+	i := strings.Index(tag, ",")
+	if i < 0 {
+		return tag
+	}
+	return tag[0:i]
+}
+
+func setXmlValue(v reflect.Value, val string) {
+	log.Printf("setXmlValue %v = %v", v.Kind(), val)
+	switch v.Kind() {
+	case reflect.Ptr:
+		switch v.Elem().Kind() {
+		case reflect.String:
+			v.Set(reflect.ValueOf(&val))
+		case reflect.Bool:
+			b := IsTrue(val)
+			v.Set(reflect.ValueOf(&b))
+		case reflect.Int:
+			i, err := strconv.Atoi(val)
+			if err == nil {
+				v.Set(reflect.ValueOf(&i))
+			}
+		}
+	case reflect.String:
+		log.Printf("set %v to %v", v, val)
+		v.SetString(val)
+	case reflect.Bool:
+		v.SetBool(IsTrue(val))
+	case reflect.Int:
+		i, err := strconv.Atoi(val)
+		if err == nil {
+			v.SetInt(int64(i))
+		}
+	}
 }

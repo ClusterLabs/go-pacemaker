@@ -18,6 +18,16 @@ Major missing features:
 * Writing changes back to the CIB
 
 
+* Get CIB as JSON
+* Get CibObjects as JSON
+* Make changes
+* Create CibObjects
+* Get status of resources and nodes
+* History information
+* Meta information about agents etc.
+
+
+
 ## Compatibility
 
 Right now, I'm mainly focused on coming up with a good mapping between
@@ -45,20 +55,18 @@ Here's a brief example of retrieving a nicely formatted JSON version
 of the current cluster status:
 
 ```go
-cib := pacemaker.NewCib()
-defer cib.Delete()
-err := cib.SignOn(pacemaker.Query)
+cib, err := pacemaker.OpenCib()
+defer cib.Close()
 if err != nil {
-    log.Fatal(err)
+	log.Fatal(err)
 }
-defer cib.SignOff()
 
 err = cib.Decode()
 if err != nil {
     log.Fatal(err)
 }
 
-data, err := cib.Status.ToJson()
+data, err := cib.ToJson()
 if err != nil {
     log.Fatal(err)
 }
