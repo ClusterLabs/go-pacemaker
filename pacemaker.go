@@ -138,6 +138,8 @@ type ResourceStateOp struct {
 	QueueTime string `xml:"queue-time,attr" json:"queue-time,omitempty"`
 	OnNode string `xml:"on_node,attr" json:"on-node,omitempty"`
 	ExitReason string `xml:"exit-reason,attr" json:"exit-reason,omitempty"`
+	TransitionKey string `xml:"transition-key,attr" json:"transition-key,omitempty"`
+	TransitionMagic string `xml:"transition-magic,attr" json:"transition-magic,omitempty"`
 }
 
 // /cib/status/node_state/lrm/lrm_resources/lrm_resource
@@ -185,6 +187,53 @@ type CibVersion struct {
 
 func (ver *CibVersion) String() string {
 	return fmt.Sprintf("%d:%d:%d", ver.AdminEpoch, ver.Epoch, ver.NumUpdates)
+}
+
+type TransitionMagic struct {
+	Op *ResourceStateOp
+	Uuid string
+	TransitionId int
+	ActionId int
+	OpStatus int
+	OpRc int
+	TargetRc int
+}
+
+func (op *ResourceStateOp) DecodeTransitionMagic() TransitionMagic {
+	magic := C.CString(op.TransitionMagic)
+	defer C.free(unsafe.Pointer(magic))
+	var uuid *C.char
+	var transition_id C.int
+	var action_id C.int
+	var op_status C.int
+	var op_rc C.int
+	var target_rc C.int
+	C.decode_transition_magic(magic, &uuid, &transition_id, &action_id, &op_status, &op_rc, &target_rc)
+	return TransitionMagic{
+		op,
+		C.GoString(uuid),
+		(int)(transition_id),
+		(int)(action_id),
+		(int)(op_status),
+		(int)(op_rc),
+		(int)(target_rc),
+	}
+}
+
+func (status *Status) ResourceStatus(id string) string {
+	state := "stopped"
+	for _, node := range status.NodeState {
+		for _, rsc := range node.Resources {
+			if rsc.Id != id {
+				continue
+			}
+			for _, op := range rsc.Ops {
+				if op.Rc == 0 {
+				}
+			}
+		}
+	}
+	return state
 }
 
 func OpenCib(options ...func (*CibOpenConfig)) (*Cib, error) {
