@@ -1,13 +1,12 @@
 // The pacemaker package provides an API for reading the Pacemaker cluster configuration (CIB).
+// Copyright (C) 2017 Kristoffer Gronlund <kgronlund@suse.com>
+// See LICENSE for license.
 package pacemaker
 
 import (
 	"unsafe"
 	"fmt"
-	"encoding/xml"
-	"encoding/json"
 	"strings"
-	"bytes"
 )
 
 /*
@@ -131,62 +130,6 @@ type Element struct {
 // method is used.
 type Cib struct {
 	cCib *C.cib_t
-	Attr map[string]string
-	Config *Element
-	Status Status `xml:"status" json:"status"`
-}
-
-// /cib/status/node_state/lrm/lrm_resources/lrm_resource/lrm_rsc_op
-// Can be marshalled/unmarshalled
-type ResourceStateOp struct {
-	Operation string `xml:"operation,attr" json:"operation,omitempty"`
-	CallId int `xml:"call-id,attr" json:"call-id,omitempty"`
-	Rc int `xml:"rc-code,attr" json:"rc-code,omitempty"`
-	LastRun string `xml:"last-run,attr" json:"last-run,omitempty"`
-	LastRcChange string `xml:"last-rc-change,attr" json:"last-rc-change,omitempty"`
-	ExecTime string `xml:"exec-time,attr" json:"exec-time,omitempty"`
-	QueueTime string `xml:"queue-time,attr" json:"queue-time,omitempty"`
-	OnNode string `xml:"on_node,attr" json:"on-node,omitempty"`
-	ExitReason string `xml:"exit-reason,attr" json:"exit-reason,omitempty"`
-	TransitionKey string `xml:"transition-key,attr" json:"transition-key,omitempty"`
-	TransitionMagic string `xml:"transition-magic,attr" json:"transition-magic,omitempty"`
-}
-
-// /cib/status/node_state/lrm/lrm_resources/lrm_resource
-// Can be marshalled/unmarshalled
-type ResourceState struct {
-	Id string `xml:"id,attr" json:"id,omitempty"`
-	Type string `xml:"type,attr" json:"type,omitempty"`
-	Class string `xml:"class,attr" json:"class,omitempty"`
-	Provider string `xml:"provider,attr" json:"provider,omitempty"`
-	Ops []ResourceStateOp `xml:"lrm_rsc_op" json:"ops,omitempty"`
-}
-
-// /cib/status/node_state/transient_attributes/instance_attributes/nvpair
-// Can be marshalled/unmarshalled
-type SimpleNVPair struct {
-	Name string `xml:"name,attr" json:"name"`
-	Value string `xml:"value,attr" json:"value"`
-}
-
-// /cib/status/node_state
-// Can be marshalled/unmarshalled
-type NodeState struct {
-	Id string `xml:"id,attr" json:"id,omitempty"`
-	Uname string `xml:"uname,attr" json:"uname,omitempty"`
-	InCcm bool `xml:"in_ccm,attr" json:"in-ccm,omitempty"`
-	Crmd string `xml:"crmd,attr" json:"crmd,omitempty"`
-	CrmDebugOrigin string `xml:"crm-debug-origin,attr" json:"crm-debug-origin,omitempty"`
-	Join string `xml:"join,attr" json:"join,omitempty"`
-	Expected string `xml:"expected,attr" json:"expected,omitempty"`
-	Resources []ResourceState `xml:"lrm>lrm_resources>lrm_resource" json:"resources,omitempty"`
-	Attributes []SimpleNVPair `xml:"transient_attributes>instance_attributes>nvpair" json:"attributes,omitempty"`
-}
-
-// /cib/status
-// Can be marshalled/unmarshalled
-type Status struct {
-	NodeState []NodeState `xml:"node_state" json:"node-state,omitempty"`
 }
 
 type CibVersion struct {
@@ -197,53 +140,6 @@ type CibVersion struct {
 
 func (ver *CibVersion) String() string {
 	return fmt.Sprintf("%d:%d:%d", ver.AdminEpoch, ver.Epoch, ver.NumUpdates)
-}
-
-type TransitionMagic struct {
-	Op *ResourceStateOp
-	Uuid string
-	TransitionId int
-	ActionId int
-	OpStatus int
-	OpRc int
-	TargetRc int
-}
-
-func (op *ResourceStateOp) DecodeTransitionMagic() TransitionMagic {
-	magic := C.CString(op.TransitionMagic)
-	defer C.free(unsafe.Pointer(magic))
-	var uuid *C.char
-	var transition_id C.int
-	var action_id C.int
-	var op_status C.int
-	var op_rc C.int
-	var target_rc C.int
-	C.decode_transition_magic(magic, &uuid, &transition_id, &action_id, &op_status, &op_rc, &target_rc)
-	return TransitionMagic{
-		op,
-		C.GoString(uuid),
-		(int)(transition_id),
-		(int)(action_id),
-		(int)(op_status),
-		(int)(op_rc),
-		(int)(target_rc),
-	}
-}
-
-func (status *Status) ResourceStatus(id string) string {
-	state := "stopped"
-	for _, node := range status.NodeState {
-		for _, rsc := range node.Resources {
-			if rsc.Id != id {
-				continue
-			}
-			for _, op := range rsc.Ops {
-				if op.Rc == 0 {
-				}
-			}
-		}
-	}
-	return state
 }
 
 func OpenCib(options ...func (*CibOpenConfig)) (*Cib, error) {
@@ -349,17 +245,6 @@ func (cib *Cib) Version() (*CibVersion, error) {
 	return nil, &CibError{"Failed to get CIB version details"}
 }
 
-func (cib *Cib) Decode() error {
-	xmldata, err := cib.Query()
-	if err != nil {
-		return err
-	}
-	if err = cib.decodeCibObjects(xmldata); err != nil {
-		return err
-	}
-	return nil
-}
-
 func (cib *Cib) Query() ([]byte, error) {
 	var root *C.xmlNode
 	root, err := cib.queryImpl("", false)
@@ -417,56 +302,13 @@ func (cib *Cib) QueryXPathNoChildren(xpath string) ([]byte, error) {
 	return C.GoBytes(unsafe.Pointer(buffer), (C.int)(C.strlen(buffer))), nil
 }
 
-func (status *Status) ToJson() ([]byte, error) {
-	return json.Marshal(status)
-}
-
 func init() {
 	s := C.CString("go-pacemaker")
 	C.crm_log_init(s, C.LOG_CRIT, 0, 0, 0, nil, 1)
 	C.free(unsafe.Pointer(s))
 }
 
-var ValidOperationRequires = []string{"nothing", "quorum", "fencing", "unfencing"}
-var ValidOperationOnFail = []string{"ignore", "block", "stop", "restart", "standby", "fence", "restart-container"}
-var ValidResourceClass = []string{"ocf", "lsb", "heartbeat", "stonith", "upstart", "service", "systemd", "nagios"}
-var ValidConstraintOrdering = []string{"group", "listed"}
-var ValidTicketLossPolicy = []string{"stop", "demote", "fence", "freeze"}
-var ValidAttributeDiscovery = []string{"always", "never", "exclusive"}
-var ValidAttributeAction = []string{"start", "promote", "demote", "stop"}
-var ValidAttributeRole = []string{"Stopped", "Started", "Master", "Slave"}
-var ValidOrderType = []string{"Optional", "Mandatory", "Serialize"}
-var ValidPermissionKind = []string{"read", "write", "deny"}
-var ValidNodeType = []string{"normal", "member", "ping", "remote"}
-
-
 func IsTrue(bstr string) bool {
 	sl := strings.ToLower(bstr)
 	return sl == "true" || sl == "on" || sl == "yes" || sl == "y" || sl == "1"
-}
-
-
-func (cib *Cib) decodeCibObjects(xmldata []byte) error {
-	decoder := xml.NewDecoder(bytes.NewReader(xmldata))
-	for {
-		t, err := decoder.Token()
-		if t == nil {
-			return nil
-		} else if err != nil {
-			return err
-		}
-		switch se := t.(type) {
-		case xml.StartElement:
-			if se.Name.Local == "cib" {
-				cib.Attr = make(map[string]string)
-				for _, attr := range se.Attr {
-					cib.Attr[attr.Name.Local] = attr.Value
-				}
-			} else if  se.Name.Local == "status" {
-				decoder.DecodeElement(&cib.Status, &se)
-			} else if se.Name.Local == "configuration" {
-			}
-		case xml.EndElement:
-		}
-	}
 }
