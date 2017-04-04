@@ -45,6 +45,12 @@ dependencies needed to compile:
 
     zypper in libpacemaker-devel libxml2-devel glib2-devel
 
+To run the tests, the pacemaker schema files need to be available as
+well. These are usually packaged separately, so to get these, you will
+need to install the `pacemaker` package as well:
+
+    zypper in pacemaker
+
 ## Usage
 
 To include the library, import `github.com/krig/go-pacemaker`.
