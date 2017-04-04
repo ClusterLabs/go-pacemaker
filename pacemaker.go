@@ -332,7 +332,6 @@ func (cib *Cib) queryImpl(xpath string, nochildren bool) (*C.xmlNode, error) {
 	return root, nil
 }
 
-
 func (cib *Cib) Version() (*CibVersion, error) {
 	var admin_epoch C.int
 	var epoch C.int
