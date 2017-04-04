@@ -66,6 +66,8 @@ type CibConnection int
 const (
 	Query CibConnection = C.cib_query
 	Command CibConnection = C.cib_command
+	NoConnection CibConnection = C.cib_no_connection
+	CommandNonBlocking CibConnection = C.cib_command_nonblocking
 )
 
 type CibOpenConfig struct {
@@ -85,6 +87,14 @@ func ForQuery(config *CibOpenConfig) {
 
 func ForCommand(config *CibOpenConfig) {
 	config.connection = Command
+}
+
+func ForNoConnection(config *CibOpenConfig) {
+	config.connection = NoConnection
+}
+
+func ForCommandNonBlocking(config *CibOpenConfig) {
+	config.connection = CommandNonBlocking
 }
 
 func FromFile(file string) func(*CibOpenConfig) {
