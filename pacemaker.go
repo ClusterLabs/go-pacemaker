@@ -12,19 +12,16 @@ import (
 /*
 #cgo pkg-config: libxml-2.0 glib-2.0 libqb pacemaker pacemaker-cib
 #include <crm/cib.h>
+#include <crm/services.h>
 #include <crm/common/util.h>
+#include <crm/common/xml.h>
+#include <crm/common/mainloop.h>
 
-int go_cib_signon(cib_t* cib, const char* name, enum cib_conn_type type) {
-    return cib->cmds->signon(cib, name, type);
-}
+int go_cib_signon(cib_t* cib, const char* name, enum cib_conn_type type);
+int go_cib_signoff(cib_t* cib);
+int go_cib_query(cib_t * cib, const char *section, xmlNode ** output_data, int call_options);
+int go_cib_register_notify_callbacks(cib_t * cib);
 
-int go_cib_signoff(cib_t* cib) {
-    return cib->cmds->signoff(cib);
-}
-
-int go_cib_query(cib_t * cib, const char *section, xmlNode ** output_data, int call_options) {
-    return cib->cmds->query(cib, section, output_data, call_options);
-}
 
 */
 import "C"
@@ -245,61 +242,61 @@ func (cib *Cib) Version() (*CibVersion, error) {
 	return nil, &CibError{"Failed to get CIB version details"}
 }
 
-func (cib *Cib) Query() ([]byte, error) {
+func (cib *Cib) Query() (string, error) {
 	var root *C.xmlNode
 	root, err := cib.queryImpl("", false)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	defer C.free_xml(root)
 
 	buffer := C.dump_xml_unformatted(root)
 	defer C.free(unsafe.Pointer(buffer))
 
-	return C.GoBytes(unsafe.Pointer(buffer), (C.int)(C.strlen(buffer))), nil
+	return C.GoString(buffer), nil
 }
 
-func (cib *Cib) QueryNoChildren() ([]byte, error) {
+func (cib *Cib) QueryNoChildren() (string, error) {
 	var root *C.xmlNode
 	root, err := cib.queryImpl("", true)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	defer C.free_xml(root)
 
 	buffer := C.dump_xml_unformatted(root)
 	defer C.free(unsafe.Pointer(buffer))
 
-	return C.GoBytes(unsafe.Pointer(buffer), (C.int)(C.strlen(buffer))), nil
+	return C.GoString(buffer), nil
 }
 
 
-func (cib *Cib) QueryXPath(xpath string) ([]byte, error) {
+func (cib *Cib) QueryXPath(xpath string) (string, error) {
 	var root *C.xmlNode
 	root, err := cib.queryImpl(xpath, false)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	defer C.free_xml(root)
 
 	buffer := C.dump_xml_unformatted(root)
 	defer C.free(unsafe.Pointer(buffer))
 
-	return C.GoBytes(unsafe.Pointer(buffer), (C.int)(C.strlen(buffer))), nil
+	return C.GoString(buffer), nil
 }
 
-func (cib *Cib) QueryXPathNoChildren(xpath string) ([]byte, error) {
+func (cib *Cib) QueryXPathNoChildren(xpath string) (string, error) {
 	var root *C.xmlNode
 	root, err := cib.queryImpl(xpath, true)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	defer C.free_xml(root)
 
 	buffer := C.dump_xml_unformatted(root)
 	defer C.free(unsafe.Pointer(buffer))
 
-	return C.GoBytes(unsafe.Pointer(buffer), (C.int)(C.strlen(buffer))), nil
+	return C.GoString(buffer), nil
 }
 
 func init() {
@@ -311,4 +308,59 @@ func init() {
 func IsTrue(bstr string) bool {
 	sl := strings.ToLower(bstr)
 	return sl == "true" || sl == "on" || sl == "yes" || sl == "y" || sl == "1"
+}
+
+type CibEvent int
+
+const (
+	UpdateEvent CibEvent = 0
+	DestroyEvent CibEvent = 1
+)
+
+//go:generate stringer -type=CibEvent
+
+type CibEventFunc func(event CibEvent, cib string)
+
+type subscriptionData struct {
+	Id int
+	Callback CibEventFunc
+}
+
+
+var subscribers map[int]CibEventFunc
+
+func (cib *Cib) Subscribe(callback CibEventFunc) error {
+	if subscribers == nil {
+		subscribers = make(map[int]CibEventFunc)
+		r := C.go_cib_register_notify_callbacks(cib.cCib)
+		if r != C.pcmk_ok {
+			return formatErrorRc((int)(r))
+		}
+	}
+	id := len(subscribers)
+	subscribers[id] = callback
+	return nil
+}
+
+//export diffNotifyCallback
+func diffNotifyCallback(current_cib *C.xmlNode) {
+	buffer := C.dump_xml_unformatted(current_cib)
+	defer C.free(unsafe.Pointer(buffer))
+	txt := C.GoString(buffer)
+	for _, callback := range subscribers {
+		callback(UpdateEvent, txt)
+	}
+}
+
+//export destroyNotifyCallback
+func destroyNotifyCallback() {
+	for _, callback := range subscribers {
+		callback(DestroyEvent, "")
+	}
+}
+
+func Mainloop() {
+	mainloop := C.g_main_loop_new(nil, C.FALSE)
+	C.g_main_loop_run(mainloop)
+	C.g_main_loop_unref(mainloop)
 }
