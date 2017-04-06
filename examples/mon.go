@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"time"
-	"runtime"
 	"github.com/krig/go-pacemaker"
 )
 
@@ -27,10 +26,8 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-
+	
 	go func() {
-		runtime.LockOSThread()
-		defer runtime.UnlockOSThread()
 		pacemaker.Mainloop()
 	}()
 	for {

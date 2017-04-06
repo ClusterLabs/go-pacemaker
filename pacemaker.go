@@ -7,6 +7,7 @@ import (
 	"unsafe"
 	"fmt"
 	"strings"
+	"runtime"
 )
 
 /*
@@ -21,7 +22,7 @@ int go_cib_signon(cib_t* cib, const char* name, enum cib_conn_type type);
 int go_cib_signoff(cib_t* cib);
 int go_cib_query(cib_t * cib, const char *section, xmlNode ** output_data, int call_options);
 int go_cib_register_notify_callbacks(cib_t * cib);
-
+void go_add_idle_scheduler(GMainLoop* loop);
 
 */
 import "C"
@@ -359,8 +360,16 @@ func destroyNotifyCallback() {
 	}
 }
 
+//export goMainloopSched
+func goMainloopSched() {
+	runtime.Gosched()
+}
+
 func Mainloop() {
+	runtime.LockOSThread()
 	mainloop := C.g_main_loop_new(nil, C.FALSE)
+	C.go_add_idle_scheduler(mainloop)
 	C.g_main_loop_run(mainloop)
 	C.g_main_loop_unref(mainloop)
+	runtime.UnlockOSThread()
 }

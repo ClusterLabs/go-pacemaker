@@ -63,3 +63,12 @@ int go_cib_register_notify_callbacks(cib_t * cib) {
 	}
 	return pcmk_ok;
 }
+
+static gboolean idle_callback(gpointer user_data) {
+	extern void goMainloopSched();
+	goMainloopSched();
+}
+
+void go_add_idle_scheduler(GMainLoop* loop) {
+	g_idle_add(&idle_callback, loop);
+}
