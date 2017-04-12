@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"testing"
 	"log"
-	"bytes"
+	"strings"
 	"github.com/krig/go-pacemaker"
 	"gopkg.in/xmlpath.v2"
 )
@@ -25,7 +25,7 @@ func TestXmlpath(t *testing.T) {
 	}
 
 	path := xmlpath.MustCompile("/cib/configuration/nodes/node[@id='xxx']/@type")
-	root, err := xmlpath.Parse(bytes.NewReader(xmldata))
+	root, err := xmlpath.Parse(strings.NewReader(xmldata))
 	if err != nil {
         t.Fatal(err)
 	}
