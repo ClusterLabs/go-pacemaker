@@ -12,18 +12,7 @@ import (
 
 /*
 #cgo pkg-config: libxml-2.0 glib-2.0 libqb pacemaker pacemaker-cib
-#include <crm/cib.h>
-#include <crm/services.h>
-#include <crm/common/util.h>
-#include <crm/common/xml.h>
-#include <crm/common/mainloop.h>
-
-int go_cib_signon(cib_t* cib, const char* name, enum cib_conn_type type);
-int go_cib_signoff(cib_t* cib);
-int go_cib_query(cib_t * cib, const char *section, xmlNode ** output_data, int call_options);
-int go_cib_register_notify_callbacks(cib_t * cib);
-void go_add_idle_scheduler(GMainLoop* loop);
-
+#include "cib.h"
 */
 import "C"
 
@@ -123,11 +112,29 @@ type Element struct {
 	Elements []*Element
 }
 
+type CibEvent int
+
+const (
+	UpdateEvent CibEvent = 0
+	DestroyEvent CibEvent = 1
+)
+
+//go:generate stringer -type=CibEvent
+
+type CibEventFunc func(event CibEvent, cib string)
+
+type subscriptionData struct {
+	Id int
+	Callback CibEventFunc
+}
+
+
 // Root entity representing the CIB. Can be
 // populated with CIB data if the Decode
 // method is used.
 type Cib struct {
 	cCib *C.cib_t
+	subscribers map[int]CibEventFunc
 }
 
 type CibVersion struct {
@@ -195,6 +202,10 @@ func (cib *Cib) Close() error {
 	C.cib_delete(cib.cCib)
 	cib.cCib = nil
 	return nil
+}
+
+func (cib *Cib) Subscribers() map[int]CibEventFunc {
+	return cib.subscribers
 }
 
 func (cib *Cib) queryImpl(xpath string, nochildren bool) (*C.xmlNode, error) {
@@ -311,35 +322,19 @@ func IsTrue(bstr string) bool {
 	return sl == "true" || sl == "on" || sl == "yes" || sl == "y" || sl == "1"
 }
 
-type CibEvent int
-
-const (
-	UpdateEvent CibEvent = 0
-	DestroyEvent CibEvent = 1
-)
-
-//go:generate stringer -type=CibEvent
-
-type CibEventFunc func(event CibEvent, cib string)
-
-type subscriptionData struct {
-	Id int
-	Callback CibEventFunc
-}
-
-
-var subscribers map[int]CibEventFunc
+var the_cib *Cib
 
 func (cib *Cib) Subscribe(callback CibEventFunc) error {
-	if subscribers == nil {
-		subscribers = make(map[int]CibEventFunc)
+	the_cib = cib
+	if cib.subscribers == nil {
+		cib.subscribers = make(map[int]CibEventFunc)
 		r := C.go_cib_register_notify_callbacks(cib.cCib)
 		if r != C.pcmk_ok {
 			return formatErrorRc((int)(r))
 		}
-	}
-	id := len(subscribers)
-	subscribers[id] = callback
+	}	
+	id := len(cib.subscribers)
+	cib.subscribers[id] = callback
 	return nil
 }
 
@@ -348,14 +343,14 @@ func diffNotifyCallback(current_cib *C.xmlNode) {
 	buffer := C.dump_xml_unformatted(current_cib)
 	defer C.free(unsafe.Pointer(buffer))
 	txt := C.GoString(buffer)
-	for _, callback := range subscribers {
+	for _, callback := range the_cib.subscribers {
 		callback(UpdateEvent, txt)
 	}
 }
 
 //export destroyNotifyCallback
 func destroyNotifyCallback() {
-	for _, callback := range subscribers {
+	for _, callback := range the_cib.subscribers {
 		callback(DestroyEvent, "")
 	}
 }

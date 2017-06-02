@@ -6,6 +6,8 @@
 
 #define F_CIB_UPDATE_RESULT "cib_update_result"
 
+static cib_t *s_cib = NULL;
+
 int go_cib_signon(cib_t* cib, const char* name, enum cib_conn_type type) {
 	int rc;
 	rc = cib->cmds->signon(cib, name, type);
@@ -28,8 +30,6 @@ static void go_cib_destroy_cb(gpointer user_data) {
 	extern void destroyNotifyCallback();
 	destroyNotifyCallback();
 }
-
-static cib_t *s_cib = NULL;
 
 static void go_cib_notify_cb(const char *event, xmlNode * msg) {
 	int rc;
