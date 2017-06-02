@@ -47,25 +47,26 @@ static void go_cib_notify_cb(const char *event, xmlNode * msg) {
 }
 
 
-int go_cib_register_notify_callbacks(cib_t * cib) {
+unsigned int go_cib_register_notify_callbacks(cib_t * cib) {
 	int rc;
+	unsigned int flags;
 
 	s_cib = cib;
+	flags = 0;
 
 	rc = cib->cmds->set_connection_dnotify(cib, go_cib_destroy_cb);
-	if (rc != pcmk_ok) {
-		goto exit;
+	if (rc == pcmk_ok) {
+		flags |= GO_CIB_NOTIFY_DESTROY;
 	}
 	rc = cib->cmds->del_notify_callback(cib, T_CIB_DIFF_NOTIFY, go_cib_notify_cb);
-	if (rc != pcmk_ok) {
-		goto exit;
+	if (rc == pcmk_ok) {
+		flags |= GO_CIB_NOTIFY_ADDREMOVE;
 	}
 	rc = cib->cmds->add_notify_callback(cib, T_CIB_DIFF_NOTIFY, go_cib_notify_cb);
-	if (rc != pcmk_ok) {
-		goto exit;
+	if (rc == pcmk_ok) {
+		flags |= GO_CIB_NOTIFY_ADDREMOVE;
 	}
-exit:
-	return pcmk_ok;
+	return flags;
 }
 
 static gboolean idle_callback(gpointer user_data) {

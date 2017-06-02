@@ -135,6 +135,7 @@ type subscriptionData struct {
 type Cib struct {
 	cCib *C.cib_t
 	subscribers map[int]CibEventFunc
+	notifications uint
 }
 
 type CibVersion struct {
@@ -202,10 +203,6 @@ func (cib *Cib) Close() error {
 	C.cib_delete(cib.cCib)
 	cib.cCib = nil
 	return nil
-}
-
-func (cib *Cib) Subscribers() map[int]CibEventFunc {
-	return cib.subscribers
 }
 
 func (cib *Cib) queryImpl(xpath string, nochildren bool) (*C.xmlNode, error) {
@@ -324,18 +321,20 @@ func IsTrue(bstr string) bool {
 
 var the_cib *Cib
 
-func (cib *Cib) Subscribe(callback CibEventFunc) error {
+func (cib *Cib) Subscribers() map[int]CibEventFunc {
+	return cib.subscribers
+}
+
+func (cib *Cib) Subscribe(callback CibEventFunc) (uint, error) {
 	the_cib = cib
 	if cib.subscribers == nil {
 		cib.subscribers = make(map[int]CibEventFunc)
-		r := C.go_cib_register_notify_callbacks(cib.cCib)
-		if r != C.pcmk_ok {
-			return formatErrorRc((int)(r))
-		}
-	}	
+		flags := C.go_cib_register_notify_callbacks(cib.cCib)
+		cib.notifications = uint(flags)
+	}
 	id := len(cib.subscribers)
 	cib.subscribers[id] = callback
-	return nil
+	return cib.notifications, nil
 }
 
 //export diffNotifyCallback
