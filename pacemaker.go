@@ -366,10 +366,8 @@ func goMainloopSched() {
 }
 
 func Mainloop() {
-	runtime.LockOSThread()
 	mainloop := C.g_main_loop_new(nil, C.FALSE)
 	C.go_add_idle_scheduler(mainloop)
 	C.g_main_loop_run(mainloop)
 	C.g_main_loop_unref(mainloop)
-	runtime.UnlockOSThread()
 }
