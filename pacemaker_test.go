@@ -19,13 +19,14 @@ func TestXmlpath(t *testing.T) {
 	}
 	defer cib.Close()
 
-	xmldata, err := cib.Query()
+	doc, err := cib.Query()
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer doc.Close()
 
 	path := xmlpath.MustCompile("/cib/configuration/nodes/node[@id='xxx']/@type")
-	root, err := xmlpath.Parse(strings.NewReader(xmldata))
+	root, err := xmlpath.Parse(strings.NewReader(doc.ToString()))
 	if err != nil {
         t.Fatal(err)
 	}
@@ -67,12 +68,13 @@ func ExampleQuery() {
 	}
 	defer cib.Close()
 
-	xml, err := cib.Query()
+	doc, err := cib.Query()
 	if err != nil {
 		log.Fatal(err)
 	}
+	defer doc.Close()
 
-	fmt.Printf("%s\n", xml[0:4])
+	fmt.Printf("%s\n", doc.ToString()[0:4])
 	// Output: <cib
 }
 
@@ -83,11 +85,12 @@ func ExampleQueryXPath() {
 	}
 	defer cib.Close()
 
-	xml, err := cib.QueryXPath("//nodes/node[@id=\"xxx\"]")
+	doc, err := cib.QueryXPath("//nodes/node[@id=\"xxx\"]")
 	if err != nil {
 		log.Fatal(err)
 	}
+	defer doc.Close()
 
-	fmt.Printf("%s\n", xml)
+	fmt.Printf("%s\n", doc.ToString())
 	// Output: <node id="xxx" uname="c001n01" type="normal"/>
 }

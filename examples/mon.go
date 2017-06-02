@@ -17,12 +17,12 @@ var f_password = flag.String("password", "", "remote password to connect with")
 var f_encrypted = flag.Bool("encrypted", false, "set if remote connection is encrypted")
 
 func listenToCib(cib *pacemaker.Cib, restarter chan int) {
-	_, err := cib.Subscribe(func(event pacemaker.CibEvent, cib string) {
+	_, err := cib.Subscribe(func(event pacemaker.CibEvent, doc *pacemaker.CibDocument) {
 		if event == pacemaker.UpdateEvent {
 			fmt.Printf("\n")
 			fmt.Printf("event: %s\n", event)
 			if *f_verbose {
-				fmt.Printf("cib: %s\n", cib)
+				fmt.Printf("cib: %s\n", doc.ToString())
 			}
 		} else {
 			log.Printf("lost connection: %s\n", event)
@@ -49,13 +49,14 @@ func connectToCib() (*pacemaker.Cib, error) {
 		return nil, err
 	}
 
-	xmldata, err := cib.Query()
+	doc, err := cib.Query()
 	if err != nil {
 		log.Print("Failed to query CIB")
 		return nil, err
 	}
+	defer doc.Close()
 	if *f_verbose {
-		fmt.Printf("CIB: %s\n", xmldata)
+		fmt.Printf("CIB: %s\n", doc.ToString())
 	}
 	return cib, nil
 }

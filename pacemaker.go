@@ -121,7 +121,7 @@ const (
 
 //go:generate stringer -type=CibEvent
 
-type CibEventFunc func(event CibEvent, cib string)
+type CibEventFunc func(event CibEvent, doc *CibDocument)
 
 type subscriptionData struct {
 	Id int
@@ -142,6 +142,10 @@ type CibVersion struct {
 	AdminEpoch int32
 	Epoch int32
 	NumUpdates int32
+}
+
+type CibDocument struct {
+	xml *C.xmlNode
 }
 
 func (ver *CibVersion) String() string {
@@ -205,6 +209,28 @@ func (cib *Cib) Close() error {
 	return nil
 }
 
+func (doc *CibDocument) Version() *CibVersion {
+	var admin_epoch C.int
+	var epoch C.int
+	var num_updates C.int
+	ok := C.cib_version_details(doc.xml, (*C.int)(unsafe.Pointer(&admin_epoch)), (*C.int)(unsafe.Pointer(&epoch)), (*C.int)(unsafe.Pointer(&num_updates)))
+	if ok == 1 {
+		return &CibVersion{(int32)(admin_epoch), (int32)(epoch), (int32)(num_updates)}
+	}
+	return nil
+}
+
+func (doc *CibDocument) ToString() string {
+	buffer := C.dump_xml_unformatted(doc.xml)
+	defer C.free(unsafe.Pointer(buffer))
+	return C.GoString(buffer)
+}
+
+func (doc *CibDocument) Close() {
+	C.free_xml(doc.xml)
+}
+
+
 func (cib *Cib) queryImpl(xpath string, nochildren bool) (*C.xmlNode, error) {
 	var root *C.xmlNode
 	var rc C.int
@@ -251,61 +277,42 @@ func (cib *Cib) Version() (*CibVersion, error) {
 	return nil, &CibError{"Failed to get CIB version details"}
 }
 
-func (cib *Cib) Query() (string, error) {
+func (cib *Cib) Query() (*CibDocument, error) {
 	var root *C.xmlNode
 	root, err := cib.queryImpl("", false)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	defer C.free_xml(root)
 
-	buffer := C.dump_xml_unformatted(root)
-	defer C.free(unsafe.Pointer(buffer))
-
-	return C.GoString(buffer), nil
+	return &CibDocument{root}, nil
 }
 
-func (cib *Cib) QueryNoChildren() (string, error) {
+func (cib *Cib) QueryNoChildren() (*CibDocument, error) {
 	var root *C.xmlNode
 	root, err := cib.queryImpl("", true)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	defer C.free_xml(root)
-
-	buffer := C.dump_xml_unformatted(root)
-	defer C.free(unsafe.Pointer(buffer))
-
-	return C.GoString(buffer), nil
+	return &CibDocument{root}, nil
 }
 
 
-func (cib *Cib) QueryXPath(xpath string) (string, error) {
+func (cib *Cib) QueryXPath(xpath string) (*CibDocument, error) {
 	var root *C.xmlNode
 	root, err := cib.queryImpl(xpath, false)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	defer C.free_xml(root)
-
-	buffer := C.dump_xml_unformatted(root)
-	defer C.free(unsafe.Pointer(buffer))
-
-	return C.GoString(buffer), nil
+	return &CibDocument{root}, nil
 }
 
-func (cib *Cib) QueryXPathNoChildren(xpath string) (string, error) {
+func (cib *Cib) QueryXPathNoChildren(xpath string) (*CibDocument, error) {
 	var root *C.xmlNode
 	root, err := cib.queryImpl(xpath, true)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	defer C.free_xml(root)
-
-	buffer := C.dump_xml_unformatted(root)
-	defer C.free(unsafe.Pointer(buffer))
-
-	return C.GoString(buffer), nil
+	return &CibDocument{root}, nil
 }
 
 func init() {
@@ -339,18 +346,15 @@ func (cib *Cib) Subscribe(callback CibEventFunc) (uint, error) {
 
 //export diffNotifyCallback
 func diffNotifyCallback(current_cib *C.xmlNode) {
-	buffer := C.dump_xml_unformatted(current_cib)
-	defer C.free(unsafe.Pointer(buffer))
-	txt := C.GoString(buffer)
 	for _, callback := range the_cib.subscribers {
-		callback(UpdateEvent, txt)
+		callback(UpdateEvent, &CibDocument{current_cib})
 	}
 }
 
 //export destroyNotifyCallback
 func destroyNotifyCallback() {
 	for _, callback := range the_cib.subscribers {
-		callback(DestroyEvent, "")
+		callback(DestroyEvent, nil)
 	}
 }
 
