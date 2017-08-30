@@ -1,8 +1,30 @@
+// The pacemaker package provides an API for reading the Pacemaker cluster configuration (CIB).
+// Copyright (C) 2017 Kristoffer Gronlund <kgronlund@suse.com>
+// See LICENSE for license.
+package pacemaker
+
 /*
-  Copyright (C) 2017 Kristoffer Gronlund <kgronlund@suse.com>
-  See LICENSE for license.
-*/
-#include "_cgo_export.h"
+#cgo LDFLAGS: -Wl,-unresolved-symbols=ignore-all
+
+#include <crm/cib.h>
+#include <crm/services.h>
+#include <crm/common/util.h>
+#include <crm/common/xml.h>
+#include <crm/common/mainloop.h>
+
+// Flags returned by go_cib_register_notify_callbacks
+// indicating which notifications were actually
+// available to register (different connection types
+// enable different sets of notifications)
+#define GO_CIB_NOTIFY_DESTROY 0x1
+#define GO_CIB_NOTIFY_ADDREMOVE 0x2
+
+extern int go_cib_signon(cib_t* cib, const char* name, enum cib_conn_type type);
+extern int go_cib_signoff(cib_t* cib);
+extern int go_cib_query(cib_t * cib, const char *section, xmlNode ** output_data, int call_options);
+extern unsigned int go_cib_register_notify_callbacks(cib_t * cib);
+extern void go_add_idle_scheduler(GMainLoop* loop);
+
 
 #define F_CIB_UPDATE_RESULT "cib_update_result"
 
@@ -77,3 +99,7 @@ static gboolean idle_callback(gpointer user_data) {
 void go_add_idle_scheduler(GMainLoop* loop) {
 	g_idle_add(&idle_callback, loop);
 }
+
+*/
+import "C"
+
