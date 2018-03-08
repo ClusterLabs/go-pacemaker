@@ -11,7 +11,6 @@ import (
 )
 
 /*
-#cgo LDFLAGS: -Wl,-unresolved-symbols=ignore-all
 #cgo pkg-config: libxml-2.0 glib-2.0 libqb pacemaker pacemaker-cib
 #include <crm/cib.h>
 #include <crm/services.h>

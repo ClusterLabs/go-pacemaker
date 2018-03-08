@@ -4,7 +4,6 @@
 package pacemaker
 
 /*
-#cgo LDFLAGS: -Wl,-unresolved-symbols=ignore-all
 
 #include <crm/cib.h>
 #include <crm/services.h>
