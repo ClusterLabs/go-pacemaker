@@ -4,13 +4,12 @@ package pacemaker_test
 
 import (
 	"fmt"
-	"testing"
-	"log"
-	"strings"
 	"github.com/krig/go-pacemaker"
 	"gopkg.in/xmlpath.v2"
+	"log"
+	"strings"
+	"testing"
 )
-
 
 func TestXmlpath(t *testing.T) {
 	cib, err := pacemaker.OpenCib(pacemaker.FromFile("testdata/simple.xml"))
@@ -28,7 +27,7 @@ func TestXmlpath(t *testing.T) {
 	path := xmlpath.MustCompile("/cib/configuration/nodes/node[@id='xxx']/@type")
 	root, err := xmlpath.Parse(strings.NewReader(doc.ToString()))
 	if err != nil {
-        t.Fatal(err)
+		t.Fatal(err)
 	}
 	value, ok := path.String(root)
 	if !ok {
@@ -38,7 +37,6 @@ func TestXmlpath(t *testing.T) {
 		t.Error(fmt.Sprintf("Expected 'normal', got '%v'", value))
 	}
 }
-
 
 func TestVersion(t *testing.T) {
 	cib, err := pacemaker.OpenCib(pacemaker.FromFile("testdata/simple.xml"))
@@ -59,7 +57,6 @@ func TestVersion(t *testing.T) {
 		t.Error("Expected epoch == 0, got ", ver.Epoch)
 	}
 }
-
 
 func ExampleQuery() {
 	cib, err := pacemaker.OpenCib(pacemaker.FromFile("testdata/simple.xml"))

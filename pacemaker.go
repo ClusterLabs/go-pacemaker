@@ -4,10 +4,10 @@
 package pacemaker
 
 import (
-	"unsafe"
 	"fmt"
-	"strings"
 	"runtime"
+	"strings"
+	"unsafe"
 )
 
 /*
@@ -67,21 +67,21 @@ func formatErrorRc(rc int) *CibError {
 type CibConnection int
 
 const (
-	Query CibConnection = C.cib_query
-	Command CibConnection = C.cib_command
-	NoConnection CibConnection = C.cib_no_connection
+	Query              CibConnection = C.cib_query
+	Command            CibConnection = C.cib_command
+	NoConnection       CibConnection = C.cib_no_connection
 	CommandNonBlocking CibConnection = C.cib_command_nonblocking
 )
 
 type CibOpenConfig struct {
 	connection CibConnection
-	file string
-	shadow string
-	server string
-	user string
-	passwd string
-	port int
-	encrypted bool
+	file       string
+	shadow     string
+	server     string
+	user       string
+	passwd     string
+	port       int
+	encrypted  bool
 }
 
 func ForQuery(config *CibOpenConfig) {
@@ -112,7 +112,7 @@ func FromShadow(shadow string) func(*CibOpenConfig) {
 	}
 }
 
-func FromRemote(server, user, passwd string, port int, encrypted bool) func (*CibOpenConfig) {
+func FromRemote(server, user, passwd string, port int, encrypted bool) func(*CibOpenConfig) {
 	return func(config *CibOpenConfig) {
 		config.server = server
 		config.user = user
@@ -123,16 +123,16 @@ func FromRemote(server, user, passwd string, port int, encrypted bool) func (*Ci
 }
 
 type Element struct {
-	Type string
-	Id string
-	Attr map[string]string
+	Type     string
+	Id       string
+	Attr     map[string]string
 	Elements []*Element
 }
 
 type CibEvent int
 
 const (
-	UpdateEvent CibEvent = 0
+	UpdateEvent  CibEvent = 0
 	DestroyEvent CibEvent = 1
 )
 
@@ -141,23 +141,22 @@ const (
 type CibEventFunc func(event CibEvent, doc *CibDocument)
 
 type subscriptionData struct {
-	Id int
+	Id       int
 	Callback CibEventFunc
 }
-
 
 // Root entity representing the CIB. Can be
 // populated with CIB data if the Decode
 // method is used.
 type Cib struct {
-	cCib *C.cib_t
-	subscribers map[int]CibEventFunc
+	cCib          *C.cib_t
+	subscribers   map[int]CibEventFunc
 	notifications uint
 }
 
 type CibVersion struct {
 	AdminEpoch int32
-	Epoch int32
+	Epoch      int32
 	NumUpdates int32
 }
 
@@ -169,7 +168,7 @@ func (ver *CibVersion) String() string {
 	return fmt.Sprintf("%d:%d:%d", ver.AdminEpoch, ver.Epoch, ver.NumUpdates)
 }
 
-func OpenCib(options ...func (*CibOpenConfig)) (*Cib, error) {
+func OpenCib(options ...func(*CibOpenConfig)) (*Cib, error) {
 	var cib Cib
 	config := CibOpenConfig{}
 	for _, opt := range options {
@@ -247,7 +246,6 @@ func (doc *CibDocument) Close() {
 	C.free_xml(doc.xml)
 }
 
-
 func (cib *Cib) queryImpl(xpath string, nochildren bool) (*C.xmlNode, error) {
 	var root *C.xmlNode
 	var rc C.int
@@ -312,7 +310,6 @@ func (cib *Cib) QueryNoChildren() (*CibDocument, error) {
 	}
 	return &CibDocument{root}, nil
 }
-
 
 func (cib *Cib) QueryXPath(xpath string) (*CibDocument, error) {
 	var root *C.xmlNode

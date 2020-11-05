@@ -101,4 +101,3 @@ void go_add_idle_scheduler(GMainLoop* loop) {
 
 */
 import "C"
-
