@@ -3,7 +3,6 @@ module github.com/ClusterLabs/go-pacemaker
 go 1.13
 
 require (
-	github.com/krig/go-pacemaker v0.0.0-20201105090624-63a58c1772e3
 	github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e // indirect
 	golang.org/x/net v0.0.0-20201031054903-ff519b6c9102 // indirect
 	gopkg.in/check.v1 v1.0.0-20200902074654-038fdea0a05b // indirect

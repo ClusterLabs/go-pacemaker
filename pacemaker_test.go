@@ -4,7 +4,7 @@ package pacemaker_test
 
 import (
 	"fmt"
-	"github.com/krig/go-pacemaker"
+	"github.com/ClusterLabs/go-pacemaker"
 	"gopkg.in/xmlpath.v2"
 	"log"
 	"strings"
