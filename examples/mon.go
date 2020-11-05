@@ -1,27 +1,28 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"log"
 	"time"
-	"flag"
-	"github.com/krig/go-pacemaker"
+
+	"github.com/ClusterLabs/go-pacemaker"
 )
 
-var f_verbose = flag.Bool("verbose", false, "print whole cib on each update")
-var f_file = flag.String("file", "", "file to load as CIB")
-var f_remote = flag.String("remote", "", "remote server to connect to (ip)")
-var f_port = flag.Int("port", 3121, "remote port to connect to (3121)")
-var f_user = flag.String("user", "hacluster", "remote user to connect as")
-var f_password = flag.String("password", "", "remote password to connect with")
-var f_encrypted = flag.Bool("encrypted", false, "set if remote connection is encrypted")
+var verbose = flag.Bool("verbose", false, "print whole cib on each update")
+var file = flag.String("file", "", "file to load as CIB")
+var remoteSrv = flag.String("remote", "", "remote server to connect to (ip)")
+var port = flag.Int("port", 3121, "remote port to connect to (3121)")
+var user = flag.String("user", "hacluster", "remote user to connect as")
+var password = flag.String("password", "", "remote password to connect with")
+var encrypted = flag.Bool("encrypted", false, "set if remote connection is encrypted")
 
 func listenToCib(cib *pacemaker.Cib, restarter chan int) {
 	_, err := cib.Subscribe(func(event pacemaker.CibEvent, doc *pacemaker.CibDocument) {
 		if event == pacemaker.UpdateEvent {
 			fmt.Printf("\n")
 			fmt.Printf("event: %s\n", event)
-			if *f_verbose {
+			if *verbose {
 				fmt.Printf("cib: %s\n", doc.ToString())
 			}
 		} else {
@@ -37,10 +38,14 @@ func listenToCib(cib *pacemaker.Cib, restarter chan int) {
 func connectToCib() (*pacemaker.Cib, error) {
 	var cib *pacemaker.Cib
 	var err error
-	if *f_file != "" {
-		cib, err = pacemaker.OpenCib(pacemaker.FromFile(*f_file))
-	} else if *f_remote != "" {
-		cib, err = pacemaker.OpenCib(pacemaker.FromRemote(*f_remote, *f_user, *f_password, *f_port, *f_encrypted))
+	// connect to CIB in various ways
+	// 1 using a file
+	if *file != "" {
+		cib, err = pacemaker.OpenCib(pacemaker.FromFile(*file))
+		// 2 using a remote server
+	} else if *remoteSrv != "" {
+		cib, err = pacemaker.OpenCib(pacemaker.FromRemote(*remoteSrv, *user, *password, *port, *encrypted))
+		// 3 assuming cib is local to the binary
 	} else {
 		cib, err = pacemaker.OpenCib()
 	}
@@ -55,7 +60,7 @@ func connectToCib() (*pacemaker.Cib, error) {
 		return nil, err
 	}
 	defer doc.Close()
-	if *f_verbose {
+	if *verbose {
 		fmt.Printf("CIB: %s\n", doc.ToString())
 	}
 	return cib, nil
@@ -63,7 +68,7 @@ func connectToCib() (*pacemaker.Cib, error) {
 
 func main() {
 	flag.Parse()
-	
+
 	restarter := make(chan int)
 
 	cib, err := connectToCib()

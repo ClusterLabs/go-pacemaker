@@ -1,0 +1,7 @@
+# github.com/krig/go-pacemaker v0.0.0-20201105090624-63a58c1772e3
+github.com/krig/go-pacemaker
+# golang.org/x/net v0.0.0-20201031054903-ff519b6c9102
+golang.org/x/net/html
+golang.org/x/net/html/atom
+# gopkg.in/xmlpath.v2 v2.0.0-20150820204837-860cbeca3ebc
+gopkg.in/xmlpath.v2
