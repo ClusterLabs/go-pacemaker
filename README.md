@@ -46,6 +46,5 @@ need to install the `pacemaker` package as well:
 
 ## Usage
 
-To include the library, import `github.com/krig/go-pacemaker`.
 
 See `pacemaker_test.go` for usage examples.
