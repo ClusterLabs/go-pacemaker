@@ -57,7 +57,6 @@ static void go_cib_notify_cb(const char *event, xmlNode * msg) {
 	rc = pcmk_ok;
 
 	xmlNode *current_cib;
-	xmlNode *diff = get_message_xml(msg, F_CIB_UPDATE_RESULT);
 
 	s_cib->cmds->query(s_cib, NULL, &current_cib, cib_scope_local | cib_sync_call);
 
