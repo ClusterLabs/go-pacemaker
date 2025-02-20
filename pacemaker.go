@@ -8,6 +8,8 @@ import (
 	"runtime"
 	"strings"
 	"unsafe"
+
+	log "github.com/sirupsen/logrus"
 )
 
 /*
@@ -237,9 +239,19 @@ func (doc *CibDocument) Version() *CibVersion {
 }
 
 func (doc *CibDocument) ToString() string {
-	buffer := C.dump_xml_unformatted(doc.xml)
-	defer C.free(unsafe.Pointer(buffer))
-	return C.GoString(buffer)
+	/* The dump_xml_unformatted os deprecated in the pacemaker-2.1.9
+	 * and completely dropped from the pacemaker-3.0.0.
+	 * Basically the ToString function is broken
+	 * if the pacemaker-3.0.0 is used.
+	 * The hask-apiserver doesn't use it anymore.
+	 * TODO: either remove the ToString completely,
+	 *       or reinvent the dump_xml_unformatted in Golang.
+	 */
+
+	// buffer := C.dump_xml_unformatted(doc.xml)
+	log.Errorf("dump_xml_unformatted is no more suppored.")
+
+	return ""
 }
 
 func (doc *CibDocument) Close() {
