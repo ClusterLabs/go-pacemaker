@@ -32,6 +32,37 @@ extern int go_cib_signoff(cib_t* cib);
 extern int go_cib_query(cib_t * cib, const char *section, xmlNode ** output_data, int call_options);
 extern unsigned int go_cib_register_notify_callbacks(cib_t * cib);
 extern void go_add_idle_scheduler(GMainLoop* loop);
+
+#include <libxml/parser.h>
+#include <libxml/tree.h>
+
+static char* xmlNode2string(xmlNodePtr node) {
+    if (node == NULL) {
+        return NULL;
+    }
+
+    xmlBufferPtr buffer = xmlBufferCreate();
+    if (buffer == NULL) {
+        return NULL;
+    }
+
+    xmlDocPtr doc = node->doc;
+    if (doc == NULL) {
+        xmlBufferFree(buffer);
+        return NULL;
+    }
+
+    int bytes_written = xmlNodeDump(buffer, doc, node, 0, 0);
+    if (bytes_written == -1) {
+        xmlBufferFree(buffer);
+        return NULL;
+    }
+
+    char *result = strdup((char*) xmlBufferContent(buffer));
+    xmlBufferFree(buffer);
+
+    return result; // Don't forget to free in the go code
+}
 */
 import "C"
 
@@ -70,6 +101,7 @@ type CibConnection int
 
 const (
 	Query              CibConnection = C.cib_query
+	QueryXPath         CibConnection = C.cib_xpath
 	Command            CibConnection = C.cib_command
 	NoConnection       CibConnection = C.cib_no_connection
 	CommandNonBlocking CibConnection = C.cib_command_nonblocking
@@ -239,19 +271,13 @@ func (doc *CibDocument) Version() *CibVersion {
 }
 
 func (doc *CibDocument) ToString() string {
-	/* The dump_xml_unformatted os deprecated in the pacemaker-2.1.9
-	 * and completely dropped from the pacemaker-3.0.0.
-	 * Basically the ToString function is broken
-	 * if the pacemaker-3.0.0 is used.
-	 * The hask-apiserver doesn't use it anymore.
-	 * TODO: either remove the ToString completely,
-	 *       or reinvent the dump_xml_unformatted in Golang.
-	 */
-
-	// buffer := C.dump_xml_unformatted(doc.xml)
-	log.Errorf("dump_xml_unformatted is no more suppored.")
-
-	return ""
+	buffer := C.xmlNode2string(doc.xml)
+	if buffer == nil {
+		log.Errorf("Error: Failed to convert XML")
+		return ""
+	}
+	defer C.free(unsafe.Pointer(buffer))
+	return C.GoString(buffer)
 }
 
 func (doc *CibDocument) Close() {
