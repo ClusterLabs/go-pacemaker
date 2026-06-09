@@ -15,6 +15,7 @@ import (
 /*
 #cgo pkg-config: libxml-2.0 glib-2.0 libqb pacemaker pacemaker-cib
 #include <crm/cib.h>
+#include <crm/crm.h>
 #include <crm/services.h>
 #include <crm/common/util.h>
 #include <crm/common/xml.h>
